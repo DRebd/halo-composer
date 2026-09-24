@@ -7,6 +7,7 @@
 - **Your settings get reset.** Entering flashing mode by holding Esc wipes the keyboard's saved settings: VIA key changes, lighting, and the Composer scene. Your layout is already backed up: `backups/stock-2.1.5_2026-09-23_2346.json`. It's NuPhy's factory layout, so nothing needs restoring. Bluetooth pairings are stored in the separate wireless chip and *should* survive (unverified).
 - **Close VIA and Halo Studio** (every tab). Two programs talking to the keyboard at once cause the "incorrect response" errors you saw before.
 - **Use the USB-C cable, with the mode switch on the back set to wired.** Flashing and the editor only work over the cable.
+- **Hardware recovery button:** remove the **Caps Lock** keycap. There's a small black button next to its switch; hold it while plugging in the cable to force flashing mode even if the firmware won't start. This is documented in ryodeushii's readme and his recovery instructions (`keyboards/nuphy/halo75v2/ansi/readme.md`, `keyboards/nuphy/instructions.md`). It isn't on NuPhy's page.
 - The two unexplained NuPhy keys on **Fn+M+R** and **Fn+M+T** won't exist after flashing. They aren't in any published source code.
 
 ## Part 1: one-time setup
@@ -26,7 +27,7 @@ These are NuPhy's official steps (https://nuphy.com/pages/update-instructions, u
 1. Unplug the keyboard and set the switch to **wired**.
 2. Open **QMK Toolbox** → **File → Open** → pick the `.bin` file.
 3. **Hold Esc**, keep holding it, and plug in the USB cable. Release Esc when **yellow text** appears in the Toolbox window saying a DFU device connected. The keyboard stops typing while it's in this mode; that's expected.
-   - No yellow text? Unplug and try again, holding Esc *before* the cable goes in. If it still doesn't appear, the flashing driver may be missing. QMK Toolbox has a driver install option in its Tools menu (from memory, not verified); it needs admin approval.
+   - No yellow text? Unplug and try again, holding Esc *before* the cable goes in. If the Toolbox shows **(NO DRIVER)**, the flashing driver is missing: press **Ctrl+N** in QMK Toolbox to install it (approve the admin prompt; if nothing happens, run QMK Toolbox as Administrator), then retry. This comes from ryodeushii's flashing instructions.
 4. Click **Flash**. Wait for **"Flash complete"**. Don't unplug during flashing.
 5. Unplug and re-plug, then type a few characters to check it works.
 
@@ -87,7 +88,7 @@ Or in Studio: **Scenes → My scenes** keeps everything you saved in that browse
 | Symptom | Likely cause and fix |
 |---|---|
 | No yellow "DFU" text in QMK Toolbox | Esc wasn't held before the cable went in, the switch isn't on wired, or the driver is missing (see Part 2, step 3) |
-| Keyboard doesn't type after flashing | Unplug and re-plug. If it's still dead, flash NuPhy's `.bin` (Part 4). If Esc-hold no longer reaches flashing mode, the fallback is the chip's hardware boot button. The chat said it's under the Caps Lock keycap; that's unconfirmed, so check before prying. |
+| Keyboard doesn't type after flashing | Unplug and re-plug. If it's still dead, flash NuPhy's `.bin` (Part 4). If Esc-hold no longer reaches flashing mode (Esc-hold is detected by the firmware itself), use the hardware recovery button: remove the Caps Lock keycap, hold the small black button next to its switch, and plug in. |
 | Studio says "not running the Halo Composer firmware" | The keyboard is still on stock or ryodeushii `via` firmware. Flash `...composer.bin` |
 | Studio "timeout" or VIA "Receiving incorrect response" | Another tab or app is using the keyboard. Close VIA and other Studio tabs, then reconnect |
 | Keys dark but the halo lit, or the reverse | Brightness: Fn+↑ for keys, Fn+M+↑ for the halo. In Studio, check the zone's Min/Max brightness |

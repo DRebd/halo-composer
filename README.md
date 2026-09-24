@@ -15,6 +15,7 @@
 | Open the editor (Chrome or Edge on a desktop) | **https://drebd.github.io/halo-composer/** |
 | Put the firmware on the keyboard, or go back to stock | [docs/FLASHING.md](docs/FLASHING.md) |
 | Learn the editor and the keyboard shortcuts | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) |
+| See what ryodeushii's firmware and Halo Composer each add (one page) | [docs/WHATS_DIFFERENT.md](docs/WHATS_DIFFERENT.md) |
 | See the plan, what changed from the original design, and what's verified | [docs/PLAN.md](docs/PLAN.md) |
 | Understand how it works (firmware, protocol, data format) | [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) |
 | Read why NuPhy's "QMK/VIA" falls short, plus the research and roadmap | [docs/BACKGROUND.md](docs/BACKGROUND.md) |

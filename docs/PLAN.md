@@ -60,7 +60,7 @@ The chat's transcript, its three output files and the lighting cheat-sheet page 
 ### From the chat, but not verifiable without the keyboard
 
 - **Where the 45 halo LEDs physically sit** was inferred from NuPhy's code. The calibration wizard fixes it in a few minutes, and the positions are then saved on the keyboard.
-- **Hardware recovery button under the Caps Lock keycap** was claimed by the chat. NuPhy's official instructions (checked 2026-09-24) only describe the Esc-hold method. Treat the button as unconfirmed.
+- ~~Hardware recovery button under the Caps Lock keycap~~: **now confirmed** by ryodeushii's readme and recovery instructions (remove the Caps Lock keycap and hold the small button beside the switch while plugging in). NuPhy's own page only describes Esc-hold.
 - **Two unexplained NuPhy keycodes** on Fn+M+R and Fn+M+T in your stock firmware (confirmed in your backup as custom keycodes #23 and #24). They exist in neither NuPhy's nor ryodeushii's source, so they disappear after flashing. NuPhy doesn't document what they do.
 - **Frame rate on the 48 MHz chip**: estimated ≤13 ms per frame worst case. It gets measured in the bring-up.
 
@@ -95,7 +95,7 @@ Run everything locally with `.\scripts\test.ps1` (Docker needed). The same tests
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Flash fails or the new firmware won't start | Keyboard unusable until re-flashed | Keep NuPhy's 2.1.5 `.bin`. The flashing mode itself (STM32 DFU) is in the chip's read-only memory and can't be overwritten. But *Esc-hold* is detected by the firmware, so if a firmware doesn't start at all, entering flashing mode needs the chip's hardware boot button instead. The chat said it's under the Caps Lock keycap; that's unconfirmed. Stage 1 of the flash uses ryodeushii's `via` build, which is widely used, before Composer. |
+| Flash fails or the new firmware won't start | Keyboard unusable until re-flashed | Keep NuPhy's 2.1.5 `.bin`. The flashing mode itself (STM32 DFU) is in the chip's read-only memory and can't be overwritten. But *Esc-hold* is detected by the firmware, so if a firmware doesn't start at all, use the hardware recovery button under the Caps Lock keycap (confirmed in ryodeushii's docs). Stage 1 of the flash uses ryodeushii's `via` build, which is widely used, before Composer. |
 | Unreleased ryodeushii base misbehaves (wireless, sleep, battery) | Daily annoyance | Stage 1 of the flash tests his code alone. The last public release (ryo-1.1.4, Sep 2024) could be a fallback base: the engine is portable, but the hooks would need adapting. |
 | Lighting too slow on the M0 chip with heavy scenes (ripples + 8 recent key presses) | Laggy animation, or in the worst case typing latency | Measure with `halo_kb.py selftest`. Rendering is spread over 32 small slices per frame, and the engine can cache per-LED geometry if needed. |
 | Battery life with the halo always lit | Shorter wireless use | Compare against stock over a day (checklist item). |
