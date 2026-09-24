@@ -16,3 +16,8 @@
 // Remember more simultaneous keypresses for ripples/glows
 #undef LED_HITS_TO_REMEMBER
 #define LED_HITS_TO_REMEMBER 8
+
+// Start in Composer after a flash (EEPROM wiped) so the default look shows immediately.
+// Stock effects remain one Fn+Left / Fn+Shift+Left away.
+#undef RGB_MATRIX_DEFAULT_MODE
+#define RGB_MATRIX_DEFAULT_MODE RGB_MATRIX_CUSTOM_composer

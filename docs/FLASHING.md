@@ -48,8 +48,9 @@ This checks the base firmware on your keyboard before any of our code is involve
 ### Stage 2: Halo Composer (`nuphy_halo75v2_ansi_composer.bin`)
 
 - [ ] Flash it. Typing works.
-- [ ] **Turn Composer on:** press **Fn+←** repeatedly until the default Composer look appears (it's the last effect). Or have Claude Code run `python tools\halo_kb.py on`.
+- [ ] **Composer starts on by itself** after this flash. If it's not showing, press **Fn+Shift+←** once (it's the last effect in the list), or have Claude Code run `python tools\halo_kb.py on`.
 - [ ] **Default look:** warm-white keys, WASD a deeper warm tone, and an amber halo breathing gently between half and full brightness (one breath is about 4.7 s).
+- [ ] **Stock effects still work:** Fn+← steps into NuPhy's effects (Solid Color, ...) and the halo shows NuPhy's own modes again. Fn+Shift+← steps back to Composer.
 - [ ] **Brightness keys:** Fn+↑/↓ changes the keys, Fn+M+↑/↓ changes the halo (6 steps). Turn the keys all the way down: the halo must **stay lit** (this tests the LED-power patch).
 - [ ] **Indicators on top:** Caps Lock lights the status bar, Fn+\ shows the battery, and flipping the Win/Mac switch shows its indicator. None of them flicker, and they disappear cleanly.
 - [ ] **Boot animation:** unplug and re-plug. NuPhy's power-on sweep plays around the halo, then Composer takes over without a glitch.

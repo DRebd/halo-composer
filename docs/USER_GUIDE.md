@@ -8,7 +8,7 @@ You can design without a keyboard: the animated preview uses the same math as th
 
 ## Quick start: the look you asked for
 
-Your original goal was warm-white keys, WASD a slightly different shade, and an amber halo breathing between 50% and 100%. That's the **factory default** of the Composer firmware, and the starter scene **Warm Desk**. Turn Composer on (Fn+← until it appears, or Device → Turn Composer on) and it's there. Everything below is for making it your own.
+Your original goal was warm-white keys, WASD a slightly different shade, and an amber halo breathing between 50% and 100%. That's the **factory default** of the Composer firmware (the starter scene **Warm Desk**), and Composer is the effect the keyboard starts with after flashing. If you've switched to a stock effect, **Fn+Shift+←** (or Device → Turn Composer on) brings it back. Everything below is for making it your own.
 
 ## Connecting
 
@@ -121,7 +121,7 @@ These apply to the Composer firmware, which uses ryodeushii's layout (the same k
 
 | Keys | Composer on | Stock effects / halo modes |
 |---|---|---|
-| Fn + ← | Next lighting effect. Composer is the **last** one | same |
+| Fn + ← (with Shift: backwards) | Next lighting effect. Composer is the **last** one, so Fn+Shift+← from the first stock effect jumps to it | same |
 | Fn + ↑ / ↓ | **Key** brightness (Composer's master for keys) | same |
 | Fn + → | no effect on Composer | hue of stock effects |
 | Fn + , / . | no effect (each zone has its own speed) | speed of stock effects |
