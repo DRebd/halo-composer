@@ -12,3 +12,4 @@ backups/
 chat-handoff/*.bin
 chat-handoff/halo-studio.html
 chat-handoff/transcript/
+chat-handoff/*.html
