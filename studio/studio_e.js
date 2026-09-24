@@ -10,11 +10,14 @@ function placeHalo(x, y) {
   s.haloXY[i * 2] = ex; s.haloXY[i * 2 + 1] = ey; markGeom();
 }
 function advanceCalib() {
-  state.calib.idx++;
-  if (state.calib.idx >= HALO_LEDS) { state.calib.idx = HALO_LEDS - 1; state.calib.placing = false; identify(-1); recomputeRing(); toast('Calibration done. Ring order recomputed from your positions.'); }
-  else identify(state.calib.idx);
+  const c = state.calib;
+  if (!c.placing) { c.idx = (c.idx + 1) % HALO_LEDS; renderTab(); return; }
+  c.idx++;
+  if (c.idx >= HALO_LEDS) { c.idx = HALO_LEDS - 1; c.placing = false; identify(-1); recomputeRing(); toast('Calibration done. Ring order recomputed from your positions. Press Save to keep it on the keyboard.'); }
+  else identify(c.idx);
   renderTab();
 }
+function stopWalk() { if (walkTimer) { clearInterval(walkTimer); walkTimer = null; } }
 function recomputeRing() {
   const s = state.scene, xs = [], ys = [];
   for (let i = 0; i < HALO_LEDS; i++) { xs.push(s.haloXY[i * 2]); ys.push(s.haloXY[i * 2 + 1]); }
@@ -34,11 +37,12 @@ function recomputeRing() {
 }
 let walkTimer = null;
 function walkRing() {
-  clearInterval(walkTimer);
+  stopWalk();
+  if (state.calib.placing) { state.calib.placing = false; renderTab(); }
   const order = range(0, HALO_LEDS - 1).sort((a, b) => state.scene.haloRing[a] - state.scene.haloRing[b]);
   let k = 0;
   walkTimer = setInterval(() => {
-    if (k >= order.length) { clearInterval(walkTimer); identify(-1); state.calib.idx = 0; renderTab(); return; }
+    if (k >= order.length) { stopWalk(); identify(-1); state.calib.idx = 0; renderTab(); return; }
     state.calib.idx = order[k++]; identify(state.calib.idx);
   }, 380);
 }
@@ -53,7 +57,7 @@ function tabHalo(body) {
         el('li', {}, 'Can\'t see it? Press Skip. Without a keyboard you can still drag LEDs around by hand.')),
       el('div', { class: 'kv' }, el('span', {}, 'LED'), el('span', {}, `${c.idx + 1} of ${HALO_LEDS} (index ${KEY_LEDS + c.idx})`), el('span', {}, 'Guessed spot'), el('span', {}, g.group), el('span', {}, 'Position'), el('span', {}, `${state.scene.haloXY[c.idx * 2]}, ${state.scene.haloXY[c.idx * 2 + 1]}`)),
       el('div', { class: 'row' },
-        el('button', { class: 'btn primary' + (c.placing ? ' active' : ''), onclick: () => { c.placing = !c.placing; identify(c.placing ? c.idx : -1); renderTab(); } }, c.placing ? 'Stop placing' : (c.idx ? 'Resume placing' : 'Start placing')),
+        el('button', { class: 'btn primary' + (c.placing ? ' active' : ''), onclick: () => { stopWalk(); c.placing = !c.placing; identify(c.placing ? c.idx : -1); renderTab(); } }, c.placing ? 'Stop placing' : (c.idx ? 'Resume placing' : 'Start placing')),
         el('button', { class: 'btn', onclick: () => { c.idx = (c.idx + HALO_LEDS - 1) % HALO_LEDS; identify(c.placing ? c.idx : -1); renderTab(); } }, 'Prev'),
         el('button', { class: 'btn', onclick: () => advanceCalib() }, 'Skip / next'))),
     el('div', { class: 'sec' }, el('h3', {}, 'Check the order'),
@@ -68,7 +72,7 @@ function tabHalo(body) {
 // Device ---------------------------------------------------------------
 function tabDevice(body) {
   const L = state.link, i = state.info, s = state.scene;
-  if (!('hid' in navigator)) body.append(el('div', { class: 'banner' }, el('b', {}, 'No WebHID here. '), 'Open this file in desktop Chrome or Edge from http://localhost (for example: python3 -m http.server 8080, then visit localhost:8080/halo-studio.html). The preview and editor still work without a keyboard.'));
+  if (!('hid' in navigator)) body.append(el('div', { class: 'banner' }, el('b', {}, 'This browser can\'t reach USB keyboards. '), 'Open Halo Studio in desktop Chrome or Edge to connect. The preview and editor still work here without a keyboard.'));
   body.append(
     el('div', { class: 'sec' }, el('h3', {}, 'Connection'),
       L ? el('div', { class: 'kv' },
@@ -77,10 +81,10 @@ function tabDevice(body) {
         el('span', {}, 'Scene size'), el('span', {}, `${i.size} bytes`))
         : el('p', { class: 'hint' }, 'Not connected. Close VIA (and any other tab or app using the keyboard), plug in the USB cable, set the switch to wired, then press Connect keyboard.'),
       L ? el('div', { class: 'row' },
-        el('button', { class: 'btn primary', onclick: () => setActive(!i.active) }, i.active ? 'Switch back to previous effect' : 'Turn Composer on'),
-        el('button', { class: 'btn', onclick: () => readScene().then(renderTab) }, 'Read from keyboard'),
-        el('button', { class: 'btn', onclick: () => { markAll(); flush().then(() => toast('Editor pushed to the keyboard (RAM). Save to keep it.')); } }, 'Push editor to keyboard'),
-        el('button', { class: 'btn ghost', onclick: () => state.link.cmd(SUB.DEFAULTS).then(readScene).then(renderTab) }, 'Factory scene')) : null),
+        el('button', { class: 'btn primary', onclick: () => setActive(!i.active).catch(fail('Switching Composer')) }, i.active ? 'Switch back to previous effect' : 'Turn Composer on'),
+        el('button', { class: 'btn', onclick: () => readScene('read').then(renderTab).catch(fail('Reading the keyboard')) }, 'Read from keyboard'),
+        el('button', { class: 'btn', onclick: () => { markAll(); flush().then(() => toast('Editor pushed to the keyboard (RAM). Save to keep it.')).catch(fail('Pushing')); } }, 'Push editor to keyboard'),
+        el('button', { class: 'btn ghost', onclick: () => factoryScene().catch(fail('Loading the factory scene')) }, 'Factory scene')) : null),
     el('div', { class: 'sec' }, el('h3', {}, 'Scene options'),
       check('Perceptual brightness (gamma 2.2)', !!(s.flags & SF.GAMMA), (on) => { s.flags = on ? s.flags | SF.GAMMA : s.flags & ~SF.GAMMA; markFlags(); }, 'Makes low brightness steps look even; dims mid tones'),
       check('Halo follows key brightness (Fn+↑/↓) instead of Fn+M+↑/↓', !!(s.flags & SF.HALO_FOLLOWS_KEYS), (on) => { s.flags = on ? s.flags | SF.HALO_FOLLOWS_KEYS : s.flags & ~SF.HALO_FOLLOWS_KEYS; markFlags(); })),
@@ -88,11 +92,19 @@ function tabDevice(body) {
     el('div', { class: 'sec' }, el('h3', {}, 'HID log'), el('div', { class: 'log', id: 'hidlog' }, logLines.join('\n') || '—')),
   );
 }
+const fail = (what) => (e) => { log(`${what} failed: ${e.message}`); toast(`${what} failed: ${e.message}`); };
 async function stats() {
-  const a = await state.link.cmd(SUB.STATS); const f0 = a[3] | a[4] << 8 | a[5] << 16 | a[6] << 24; const t = performance.now();
-  await new Promise((r) => setTimeout(r, 2000));
-  const b = await state.link.cmd(SUB.STATS); const f1 = b[3] | b[4] << 8 | b[5] << 16 | b[6] << 24;
-  $('#statOut').textContent = `${(((f1 - f0) >>> 0) / ((performance.now() - t) / 1000)).toFixed(1)} fps · key master ${b[7]} · halo master ${b[8]} (level ${b[9]})`;
+  const out = (msg) => { const o = $('#statOut'); if (o) o.textContent = msg; };
+  try {
+    out('measuring for 2 s…');
+    const a = await state.link.cmd(SUB.STATS); const f0 = a[3] | a[4] << 8 | a[5] << 16 | a[6] << 24; const t = performance.now();
+    await sleep(2000);
+    if (!state.link) return;
+    const b = await state.link.cmd(SUB.STATS); const f1 = b[3] | b[4] << 8 | b[5] << 16 | b[6] << 24;
+    const fps = ((f1 - f0) >>> 0) / ((performance.now() - t) / 1000);
+    out(`${fps.toFixed(1)} fps${state.info?.active ? '' : ' (Composer is off: 0 is expected)'} · key master ${b[7]} · halo master ${b[8]} (level ${b[9]})`);
+    log(`frame rate ${fps.toFixed(1)} fps`);
+  } catch (e) { out(''); fail('Measuring')(e); }
 }
 
 // ------------------------------------------------------------------ wiring
@@ -109,7 +121,15 @@ function init() {
   $('#pvTyping').addEventListener('change', (e) => { state.preview.typing = e.target.checked; });
   $('#pvKeys').addEventListener('input', (e) => { state.preview.keys = +e.target.value; });
   $('#pvHalo').addEventListener('input', (e) => { state.preview.halo = +e.target.value; });
-  $('#btnConnect').addEventListener('click', async () => { if (state.link) { await state.link.close(); state.link = null; state.info = null; updateConn(); renderTab(); } else connect(); });
+  $('#btnConnect').addEventListener('click', async () => {
+    if (!state.link) { connect(); return; }
+    stopWalk();
+    if (state.calib.placing) { state.calib.placing = false; await state.link.cmd(SUB.IDENTIFY, [0xFF, 0, 0, 0, 0, 0]).catch(() => {}); }
+    await settleSync();
+    dropLink('disconnected');
+  });
+  // Leaving the page mid-calibration would leave the keyboard dark for up to a minute.
+  window.addEventListener('pagehide', () => { if (state.link && state.calib.placing) state.link.cmd(SUB.IDENTIFY, [0xFF, 0, 0, 0, 0, 0]).catch(() => {}); });
   $('#btnSave').addEventListener('click', () => saveToKeyboard().catch((e) => toast('Save failed: ' + e.message)));
   $('#btnRevert').addEventListener('click', () => revertFromKeyboard().catch((e) => toast('Revert failed: ' + e.message)));
   $('#livePush').addEventListener('change', (e) => { if (e.target.checked) scheduleSync(); });

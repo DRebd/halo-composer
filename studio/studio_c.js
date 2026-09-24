@@ -80,7 +80,10 @@ function setSel(leds, mode = 'replace') {
   else if (mode === 'toggle') leds.forEach((l) => (state.sel.has(l) ? state.sel.delete(l) : state.sel.add(l)));
   updateSelInfo();
 }
+const curSel = () => [...state.sel];
 function updateSelInfo() {
+  // Buttons that act on the selection read it when clicked; only their enabled state lives here.
+  for (const b of document.querySelectorAll('[data-needs-sel]')) b.disabled = !state.sel.size;
   const n = state.sel.size, info = $('#selInfo');
   if (!n) { info.textContent = 'Nothing selected. Click an LED, drag a box, or use a quick-select button. Shift adds, Alt removes.'; return; }
   const keys = [...state.sel].filter((l) => l < KEY_LEDS).length, halo = n - keys;

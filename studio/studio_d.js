@@ -44,36 +44,37 @@ function tabPaint(body) {
     slider('Brightness', hsv[2], 0, 255, (v) => { hsv[2] = v; setColor(HC.util.hsv2rgb(hsv[0], hsv[1], hsv[2], [0, 0, 0]), false); refreshCur(); }, pct),
   ];
   function refreshCur() { cur.children[0].style.background = rgbHex(state.color); hexIn.value = rgbHex(state.color); cur.children[1].value = rgbHex(state.color); cur.children[3].textContent = `rgb ${state.color.join(' ')}`; }
-  const sel = [...state.sel];
+  const none = !state.sel.size;
   body.append(
     el('div', { class: 'sec' }, el('h3', {}, 'Color'), cur, ...hsvRows),
     ...COLOR_PRESETS.map(([grp, list]) => el('div', { class: 'sec' }, el('h3', {}, grp), el('div', { class: 'swatches' },
       list.map(([n, rgb]) => el('button', { class: 'sw', title: n, 'aria-label': n, style: `background:${rgbHex(rgb)}`, onclick: () => setColor(rgb.slice()) }))))),
     el('div', { class: 'sec' }, el('h3', {}, 'Apply to selection'),
       el('div', { class: 'row' },
-        el('button', { class: 'btn primary', disabled: !sel.length, onclick: () => { paintLeds(sel, state.color); toast(`Painted ${sel.length} LED(s).`); } }, 'Fill selection'),
-        el('button', { class: 'btn', disabled: !sel.length, onclick: () => adjustSel(0.85) }, 'Darker'),
-        el('button', { class: 'btn', disabled: !sel.length, onclick: () => adjustSel(1.15) }, 'Lighter'),
+        el('button', { class: 'btn primary', 'data-needs-sel': true, disabled: none, onclick: () => { const sel = curSel(); paintLeds(sel, state.color); toast(`Painted ${sel.length} LED(s).`); } }, 'Fill selection'),
+        el('button', { class: 'btn', 'data-needs-sel': true, disabled: none, onclick: () => adjustSel(0.85) }, 'Darker'),
+        el('button', { class: 'btn', 'data-needs-sel': true, disabled: none, onclick: () => adjustSel(1.15) }, 'Lighter'),
         el('button', { class: 'btn', onclick: () => setTool('paint') }, 'Paint brush'),
         el('button', { class: 'btn', onclick: () => setTool('pick') }, 'Eyedropper')),
       el('p', { class: 'hint' }, 'Painted colors show wherever a zone uses "Painted colors" as its source. Effects then animate on top of them.')),
     el('div', { class: 'sec' }, el('h3', {}, 'Bake a gradient into the selection'),
-      bakeControls(sel)),
+      bakeControls()),
     el('div', { class: 'sec' }, el('h3', {}, 'Selection flags'),
       el('div', { class: 'row' },
-        el('button', { class: 'btn small', disabled: !sel.length, onclick: () => { for (const l of sel) state.scene.zoneOf[l] |= LF.NO_REACT; markZmap(sel); toast('Selection now ignores keypress overlays.'); } }, 'Ignore keypress overlays'),
-        el('button', { class: 'btn small', disabled: !sel.length, onclick: () => { for (const l of sel) state.scene.zoneOf[l] &= ~LF.NO_REACT; markZmap(sel); toast('Selection reacts to keypresses again.'); } }, 'React to keypresses'))),
+        el('button', { class: 'btn small', 'data-needs-sel': true, disabled: none, onclick: () => { const sel = curSel(); for (const l of sel) state.scene.zoneOf[l] |= LF.NO_REACT; markZmap(sel); toast('Selection now ignores keypress overlays.'); } }, 'Ignore keypress overlays'),
+        el('button', { class: 'btn small', 'data-needs-sel': true, disabled: none, onclick: () => { const sel = curSel(); for (const l of sel) state.scene.zoneOf[l] &= ~LF.NO_REACT; markZmap(sel); toast('Selection reacts to keypresses again.'); } }, 'React to keypresses'))),
   );
 }
 function adjustSel(f) { const s = state.scene; const sel = [...state.sel]; for (const l of sel) for (let k = 0; k < 3; k++) s.color[l * 3 + k] = clamp(Math.round(s.color[l * 3 + k] * f), 0, 255); markColors(sel); }
-function bakeControls(sel) {
+function bakeControls() {
   let slot = state.grad, axis = AXIS.X;
   const bar = el('div', { class: 'gbar', style: `background:${gradCss(state.scene.grad[slot])}` });
   return el('div', { class: 'sec' },
     select('Gradient', state.scene.grad.map((g, i) => `Slot ${i + 1}`), slot, (v) => { slot = v; bar.style.background = gradCss(state.scene.grad[v]); }),
     bar,
     select('Direction', AXIS_NAMES.slice(0, 7), axis, (v) => { axis = v; }),
-    el('div', { class: 'row' }, el('button', { class: 'btn', disabled: !sel.length, onclick: () => {
+    el('div', { class: 'row' }, el('button', { class: 'btn', 'data-needs-sel': true, disabled: !state.sel.size, onclick: () => {
+      const sel = curSel();
       const vals = sel.map((l) => engine.axisValue(state.scene, l, axis));
       const lo = Math.min(...vals), hi = Math.max(...vals), out = [0, 0, 0];
       sel.forEach((l, i) => { const p = hi > lo ? Math.round(((vals[i] - lo) * 255) / (hi - lo)) : 0; HC.util.gradSample(state.scene.grad[slot], p, out); paintLeds([l], out); });
@@ -89,7 +90,6 @@ function tabZones(body) {
   const counts = new Array(ZONES).fill(0); for (let i = 0; i < LED_COUNT; i++) counts[s.zoneOf[i] & 7]++;
   const upd = (fn) => { fn(z); markZone(zi); };
   const updR = (fn) => { upd(fn); renderTab(); };
-  const sel = [...state.sel];
   const meta = FX_META[z.effect];
   const params = [];
   for (const key of ['p1', 'p2']) if (meta.p[key]) { const [lab, mn, mx] = meta.p[key]; params.push(slider(lab, clamp(z[key], mn, mx), mn, mx, (v) => upd((q) => { q[key] = v; }))); }
@@ -99,7 +99,7 @@ function tabZones(body) {
       el('div', { class: 'zones' }, s.zones.map((q, i) => el('button', { class: 'zbtn' + (i === zi ? ' on' : ''), onclick: () => { state.zone = i; renderTab(); } },
         el('b', {}, el('span', { class: 'chip', style: `background:${ZONE_TINTS[i]};margin-right:5px` }), `${i + 1} ${state.zoneNames[i]}`), el('small', {}, `${counts[i]} LEDs · ${zoneSummary(q)}`)))),
       el('div', { class: 'row' },
-        el('button', { class: 'btn primary', disabled: !sel.length, onclick: () => { for (const l of sel) s.zoneOf[l] = (s.zoneOf[l] & ~LF.ZONE_MASK) | zi; markZmap(sel); updateSelInfo(); renderTab(); toast(`${sel.length} LED(s) moved to zone ${zi + 1}.`); } }, `Put selection in zone ${zi + 1}`),
+        el('button', { class: 'btn primary', 'data-needs-sel': true, disabled: !state.sel.size, onclick: () => { const sel = curSel(); for (const l of sel) s.zoneOf[l] = (s.zoneOf[l] & ~LF.ZONE_MASK) | zi; markZmap(sel); updateSelInfo(); renderTab(); toast(`${sel.length} LED(s) moved to zone ${zi + 1}.`); } }, `Put selection in zone ${zi + 1}`),
         el('button', { class: 'btn', onclick: () => { setSel(range(0, 127).filter((l) => (s.zoneOf[l] & 7) === zi)); } }, 'Select this zone'),
         el('button', { class: 'btn ghost', onclick: () => { state.view = 'zones'; syncViewSeg(); } }, 'Show zone numbers'))),
     el('div', { class: 'sec' }, el('h3', {}, `Zone ${zi + 1}`),
@@ -218,7 +218,7 @@ function tabScenes(body) {
   file.addEventListener('change', async () => { try { const j = JSON.parse(await file.files[0].text()); importProfile(j); toast(`Imported "${j.name}".`); renderTab(); } catch (e) { toast('Import failed: ' + e.message); } });
   body.append(
     el('div', { class: 'sec' }, el('h3', {}, 'Starter scenes'),
-      el('div', { class: 'scenes' }, SCENES.map((sc) => el('button', { class: 'scene', onclick: () => { state.scene = sc.build(); state.zoneNames = sc.names.concat(state.zoneNames.slice(sc.names.length)); engine.reset(); markAll(); updateSelInfo(); toast(`Loaded "${sc.name}". ${state.link ? 'Pushed to the keyboard; Save to keep it.' : ''}`); } },
+      el('div', { class: 'scenes' }, SCENES.map((sc) => el('button', { class: 'scene', onclick: () => { adoptScene(sc.build()); state.zoneNames = sc.names.concat(state.zoneNames.slice(sc.names.length)); updateSelInfo(); toast(`Loaded "${sc.name}". ${state.link ? 'Pushed to the keyboard; Save to keep it.' : ''}`); } },
         el('b', {}, sc.name), el('span', {}, sc.note))))),
     el('div', { class: 'sec' }, el('h3', {}, 'My scenes (this browser)'),
       el('div', { class: 'row' }, nameIn, el('button', { class: 'btn primary', onclick: () => { const n = nameIn.value.trim() || `Scene ${lib.length + 1}`; lib.push(exportProfile(n)); saveLibrary(lib); renderTab(); toast(`Saved "${n}" in this browser.`); } }, 'Save current')),
@@ -228,7 +228,7 @@ function tabScenes(body) {
         el('button', { class: 'btn small', onclick: () => downloadJson(p, p.name) }, 'Export'),
         el('button', { class: 'btn small', onclick: () => { lib.splice(i, 1); saveLibrary(lib); renderTab(); } }, 'Delete')))) : el('p', { class: 'hint' }, 'Nothing saved yet.'),
       el('div', { class: 'row' }, el('button', { class: 'btn', onclick: () => downloadJson(exportProfile(nameIn.value.trim() || 'halo-scene'), nameIn.value.trim() || 'halo-scene') }, 'Export current as file'), el('button', { class: 'btn', onclick: () => file.click() }, 'Import file…'), file)),
-    el('p', { class: 'hint' }, 'The keyboard stores one scene (the one you Save). Keep as many as you like here and push any of them.'),
+    el('p', { class: 'hint' }, 'The keyboard stores one scene (the one you Save). Keep as many as you like here and push any of them. Scenes here live in this browser only, for this web address: use Export to move them between computers or browsers. Loading a scene never changes your halo calibration.'),
   );
 }
 function loadLibrary() { try { return JSON.parse(localStorage.getItem(LS_KEY + '/library') || '[]'); } catch (e) { return []; } }
