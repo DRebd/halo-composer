@@ -1,0 +1,70 @@
+# Builds the firmware, runs every host test, and publishes Halo Studio to GitHub Pages.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Host tests (engine parity, protocol, Studio end-to-end)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: REQUIRE_E2E=1 bash tests/run_tests.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: halo-studio
+          path: dist/halo-studio.html
+
+  firmware:
+    name: Firmware (via fallback + Halo Composer)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build in QMK's pinned container
+        run: |
+          image=$(grep '^QMK_IMAGE=' firmware/base.env | cut -d= -f2)
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/dist:/out" "$image" bash /src/scripts/build_in_container.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: firmware-UNTESTED-on-hardware
+          path: |
+            dist/*.bin
+            dist/*.json
+            dist/SHA256SUMS.txt
+
+  pages:
+    name: Publish Halo Studio
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, firmware]
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - run: |
+          python3 studio/build_studio.py --out site
+          mv site/halo-studio.html site/index.html
+          rm site/halo-studio-preview.html
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v5
