@@ -1,0 +1,74 @@
+diff --git a/keyboards/nuphy/common/config/config.c b/keyboards/nuphy/common/config/config.c
+index 3c53a3e..9cb640e 100644
+--- a/keyboards/nuphy/common/config/config.c
++++ b/keyboards/nuphy/common/config/config.c
+@@ -215,6 +215,12 @@ void user_set_rgb_color(int index, uint8_t red, uint8_t green, uint8_t blue) {
+  * @note Turn off LEDs if not used to save some power. This is ported
+  *       from older Nuphy leaks.
+  */
++// Boards/keymaps can keep the LED drivers powered even when the key brightness
++// is 0 (e.g. Halo Composer lighting only the halo). Default: stock behaviour.
++__attribute__((weak)) bool nuphy_leds_need_power(void) {
++    return false;
++}
++
+ void led_power_handle(void) {
+     static uint32_t interval = 0;
+ 
+@@ -224,7 +230,7 @@ void led_power_handle(void) {
+     interval = timer_read32();
+ 
+     if (rgb_led_last_act > 100) { // 10ms intervals
+-        if (rgb_matrix_is_enabled() && rgb_matrix_get_val() != 0) {
++        if (rgb_matrix_is_enabled() && (rgb_matrix_get_val() != 0 || nuphy_leds_need_power())) {
+             pwr_rgb_led_on();
+         } else { // brightness is 0 or RGB off.
+             pwr_rgb_led_off();
+diff --git a/keyboards/nuphy/halo75v2/ansi/side.c b/keyboards/nuphy/halo75v2/ansi/side.c
+index dba8ca4..7e7daff 100644
+--- a/keyboards/nuphy/halo75v2/ansi/side.c
++++ b/keyboards/nuphy/halo75v2/ansi/side.c
+@@ -24,6 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ #include "side.h"
+ #include "timer.h"
+ 
++#ifdef HALO_COMPOSER_ENABLE
++bool hc_is_active(void);
++#endif
++
+ #define SIDE_INDEX 83
+ 
+ #define SIDE_LED_COUNT 5
+@@ -770,6 +774,14 @@ void side_led_show(void) {
+         return;
+     }
+ 
++#ifdef HALO_COMPOSER_ENABLE
++    // Composer renders the halo itself and draws the indicators via
++    // side_composer_overlay() from the RGB matrix indicator callback.
++    if (hc_is_active()) {
++        return;
++    }
++#endif
++
+ #if !NUPHY_SIDE_LIGHTING_ENABLED && !NUPHY_AMBIENT_LIGHTING_ENABLED
+     return;
+ #endif
+@@ -785,3 +797,17 @@ void side_led_show(void) {
+ 
+     halo_side_indicators_show();
+ }
++
++#ifdef HALO_COMPOSER_ENABLE
++bool side_power_show_active(void) {
++    return f_power_show;
++}
++
++// Battery / caps / OS / wireless indicators drawn on top of the Composer frame.
++void side_composer_overlay(void) {
++#    if (WORK_MODE == THREE_MODE)
++    bat_led_show();
++#    endif
++    halo_side_indicators_show();
++}
++#endif

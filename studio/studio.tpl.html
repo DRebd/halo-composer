@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Halo Studio</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  color-scheme: dark;
+  --ground:#0d0e11; --panel:#15171c; --raised:#1c1f26; --sunken:#0a0b0d; --line:#2a2e37; --line2:#363b46;
+  --ink:#ebe7df; --muted:#959ba6; --faint:#6b717c;
+  --amber:#ffab3d; --amber-soft:#3a2a14; --teal:#45d3c4; --teal-soft:#123331; --red:#ff6b6b; --red-soft:#3a1717;
+  --display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.45}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.1;text-wrap:balance}
+.app{display:flex;flex-direction:column;min-height:100%}
+header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#121419,#0f1115)}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
+.brand h1{font-size:24px;letter-spacing:.3px}
+.brand h1 b{color:var(--amber);font-weight:700}
+.brand span{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.pill{font-family:var(--mono);font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--line2);color:var(--muted);white-space:nowrap}
+.pill.on{color:var(--teal);border-color:var(--teal);background:var(--teal-soft)}
+.pill.warn{color:var(--amber);border-color:var(--amber);background:var(--amber-soft)}
+.btn{background:var(--raised);border:1px solid var(--line2);border-radius:8px;padding:6px 12px;font-weight:500;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--amber);color:#1b1206;border-color:var(--amber);font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent}
+.btn.small{padding:3px 8px;font-size:12.5px;border-radius:6px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn.active{border-color:var(--amber);color:var(--amber)}
+main.grid{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:0;min-height:0}
+@media (max-width:1100px){main.grid{grid-template-columns:1fr}}
+.stage{padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.stage-card{background:radial-gradient(120% 140% at 50% 0%,#15171d 0%,#0b0c0f 70%);border:1px solid var(--line);border-radius:14px;padding:10px;position:relative}
+canvas#kb{width:100%;display:block;touch-action:none}
+.stage-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.stage-bar .label{font-family:var(--display);font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-right:4px}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.seg button{background:var(--raised);border:0;padding:5px 10px;border-right:1px solid var(--line2)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--amber-soft);color:var(--amber)}
+.hint{font-size:12.5px;color:var(--muted)}
+.stats{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+aside.panel{border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0;max-height:calc(100vh - 56px);position:sticky;top:0}
+@media (max-width:1100px){aside.panel{border-left:0;border-top:1px solid var(--line);max-height:none;position:static}}
+nav.tabs{display:flex;flex-wrap:wrap;gap:2px;padding:8px 8px 0;border-bottom:1px solid var(--line)}
+nav.tabs button{background:transparent;border:0;border-bottom:2px solid transparent;padding:8px 10px;font-family:var(--display);font-size:15px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+nav.tabs button.on{color:var(--ink);border-bottom-color:var(--amber)}
+.tabbody{overflow:auto;padding:14px 16px 28px;display:flex;flex-direction:column;gap:14px}
+.sec{display:flex;flex-direction:column;gap:8px}
+.sec h3{font-size:14px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.field{display:grid;grid-template-columns:110px 1fr auto;align-items:center;gap:8px}
+.field label{color:var(--muted);font-size:13px}
+.field output{font-family:var(--mono);font-size:12px;color:var(--ink);min-width:62px;text-align:right}
+input[type=range]{width:100%;accent-color:var(--amber)}
+select,input[type=text],input[type=number]{background:var(--sunken);border:1px solid var(--line2);border-radius:6px;padding:5px 7px;min-width:0;width:100%}
+input[type=color]{width:38px;height:28px;padding:0;border:1px solid var(--line2);border-radius:6px;background:none}
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(30px,1fr));gap:6px}
+.sw{height:30px;border-radius:7px;border:1px solid rgba(255,255,255,.12);position:relative}
+.sw:hover{transform:translateY(-1px);border-color:var(--ink)}
+.chip{display:inline-block;width:14px;height:14px;border-radius:4px;border:1px solid rgba(255,255,255,.2);vertical-align:-2px}
+.zones{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.zbtn{background:var(--raised);border:1px solid var(--line2);border-radius:8px;padding:6px 6px;text-align:left;display:flex;flex-direction:column;gap:2px;min-width:0}
+.zbtn b{font-family:var(--display);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zbtn small{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zbtn.on{border-color:var(--amber);background:var(--amber-soft)}
+.desc{font-size:13px;color:var(--muted);background:var(--sunken);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.gbar{height:22px;border-radius:6px;border:1px solid var(--line2)}
+.stops{display:flex;flex-direction:column;gap:6px}
+.stop{display:grid;grid-template-columns:38px 1fr 48px 26px;gap:6px;align-items:center}
+.fxgrid{display:grid;grid-template-columns:1fr;gap:10px}
+.fxcard{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:start}
+.fxcard canvas{width:150px;height:66px;border-radius:6px;background:#08090b}
+.fxcard h4{margin:0 0 3px;font-family:var(--display);font-size:16px}
+.fxcard p{margin:0;font-size:12.5px;color:var(--muted)}
+.fxcard .btn{margin-top:6px}
+@media (max-width:460px){.fxcard{grid-template-columns:1fr}.fxcard canvas{width:100%}}
+.scenes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.scene{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:left;display:flex;flex-direction:column;gap:4px}
+.scene b{font-family:var(--display);font-size:15px}
+.scene span{font-size:12px;color:var(--muted)}
+.scene:hover{border-color:var(--amber)}
+.log{font-family:var(--mono);font-size:11px;background:var(--sunken);border:1px solid var(--line);border-radius:8px;padding:8px;max-height:180px;overflow:auto;white-space:pre-wrap;color:var(--muted)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-family:var(--mono);font-size:12px}
+.kv span:nth-child(odd){color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--raised);border:1px solid var(--line2);border-radius:10px;padding:9px 14px;box-shadow:0 10px 30px rgba(0,0,0,.5);font-size:13px;z-index:9;transition:opacity .25s}
+.toast[hidden]{display:none}
+.check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink)}
+.check input{accent-color:var(--amber);width:16px;height:16px}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono)}
+.banner{border:1px solid var(--amber);background:var(--amber-soft);color:var(--ink);border-radius:10px;padding:10px 12px;font-size:13px}
+.banner b{color:var(--amber)}
+@media (prefers-reduced-motion: reduce){.sw:hover{transform:none}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top">
+  <div class="brand"><h1>Halo <b>Studio</b></h1><span>NuPhy Halo75 V2 · Halo Composer fw</span></div>
+  <span id="connPill" class="pill">Preview only</span>
+  <label class="check" title="Send every change to the keyboard's RAM as you edit"><input type="checkbox" id="livePush" checked> Live push</label>
+  <button class="btn" id="btnConnect">Connect keyboard</button>
+  <button class="btn" id="btnRevert" disabled title="Reload the last saved scene from the keyboard">Revert</button>
+  <button class="btn primary" id="btnSave" disabled title="Write the current scene to the keyboard's EEPROM">Save to keyboard</button>
+</header>
+<main class="grid">
+  <section class="stage">
+    <div class="stage-card"><canvas id="kb" width="1200" height="520" aria-label="Keyboard preview. Click LEDs to select them."></canvas></div>
+    <div class="stage-bar">
+      <span class="label">Tool</span>
+      <div class="seg" id="toolSeg"><button data-tool="select" class="on">Select</button><button data-tool="paint">Paint</button><button data-tool="pick">Eyedropper</button><button data-tool="type">Type (test reactive)</button></div>
+      <span class="label" style="margin-left:10px">Show</span>
+      <div class="seg" id="viewSeg"><button data-view="live" class="on">Live</button><button data-view="base">Base colors</button><button data-view="zones">Zones</button></div>
+    </div>
+    <div class="stage-bar">
+      <span class="label">Select</span>
+      <div class="row" id="quickSel"></div>
+    </div>
+    <div class="stage-bar">
+      <span id="selInfo" class="hint">Nothing selected. Click an LED, drag a box, or use a quick-select button. Shift adds, Alt removes.</span>
+      <span class="stats" id="stats" style="margin-left:auto"></span>
+    </div>
+    <div class="stage-bar">
+      <span class="label">Preview</span>
+      <label class="check"><input type="checkbox" id="pvPlay" checked> Animate</label>
+      <label class="check"><input type="checkbox" id="pvTyping"> Simulated typing</label>
+      <label class="check" style="gap:6px">Key brightness <input type="range" id="pvKeys" min="0" max="255" value="255" style="width:110px"></label>
+      <label class="check" style="gap:6px">Halo level (Fn+M+↑/↓) <input type="range" id="pvHalo" min="0" max="5" value="5" style="width:80px"></label>
+    </div>
+  </section>
+  <aside class="panel">
+    <nav class="tabs" id="tabs">
+      <button data-tab="paint" class="on">Paint</button>
+      <button data-tab="zones">Zones</button>
+      <button data-tab="gradients">Gradients</button>
+      <button data-tab="effects">Effects</button>
+      <button data-tab="scenes">Scenes</button>
+      <button data-tab="halo">Halo setup</button>
+      <button data-tab="device">Device</button>
+    </nav>
+    <div class="tabbody" id="tabbody"></div>
+  </aside>
+</main>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script>/*__GEOM__*/</script>
+<script>/*__ENGINE__*/</script>
+<script>/*__APP__*/</script>
+</body>
+</html>

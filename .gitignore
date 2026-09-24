@@ -1,0 +1,14 @@
+# Local build trees and outputs (rebuilt by scripts/ and CI)
+build/
+dist/
+node_modules/
+__pycache__/
+*.pyc
+
+# Personal data: keyboard backups stay on this PC
+backups/
+
+# Original chat outputs kept locally for reference (the .md is committed)
+chat-handoff/*.bin
+chat-handoff/halo-studio.html
+chat-handoff/transcript/
