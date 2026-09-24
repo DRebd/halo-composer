@@ -38,9 +38,18 @@ static uint8_t halo_master(void) {
     return hc_halo_levels[lvl > 5 ? 5 : lvl];
 }
 
-static void hc_load(void) {
+static void hc_load(bool at_boot) {
     via_read_custom_config(&hc_scene, HC_EEPROM_OFFSET, sizeof(hc_scene));
     if (!hc_scene_valid(&hc_scene)) {
+        if (at_boot) {
+            // No valid scene means this EEPROM was last written by other firmware
+            // (stock, ryodeushii's 'via', or an older scene layout). The scene
+            // enlarges VIA's custom-config block, which moves VIA's keymap and
+            // macro storage, so VIA may be about to read stale bytes as keycodes
+            // (its EEPROM check only compares build dates). Reset them to the
+            // keymap.c defaults. After an Esc-held flash this is a harmless repeat.
+            eeconfig_init_via();
+        }
         hc_scene_defaults(&hc_scene);
         via_update_custom_config(&hc_scene, HC_EEPROM_OFFSET, sizeof(hc_scene));
     }
@@ -49,8 +58,12 @@ static void hc_load(void) {
 void hc_init(void) {
     if (hc_inited) return;
     hc_state_init(&hc_state);
-    hc_load();
+    hc_load(true);
     hc_inited = true;
+}
+
+static bool hc_identify_active(void) {
+    return hc_ident.led != 0xFF && (int32_t)(hc_ident.until - g_rgb_timer) > 0;
 }
 
 bool hc_is_active(void) {
@@ -74,7 +87,7 @@ bool hc_rgb_effect(effect_params_t *params) {
     }
     const uint8_t mk         = rgb_matrix_get_val();
     const uint8_t mh         = halo_master();
-    const bool    ident      = hc_ident.led != 0xFF && (int32_t)(hc_ident.until - t) > 0;
+    const bool    ident      = hc_identify_active();
     const bool    power_show = side_power_show_active();
 
     for (uint8_t i = led_min; i < led_max && i < HC_LED_COUNT; i++) {
@@ -100,7 +113,9 @@ void hc_process_key(uint8_t row, uint8_t col, bool pressed) {
 }
 
 void hc_indicators(void) {
-    if (hc_is_active()) side_composer_overlay();
+    // While the calibration wizard lights single LEDs, keep the status-bar
+    // indicators (caps lock, OS, wireless) from lighting halo LEDs too.
+    if (hc_is_active() && !hc_identify_active()) side_composer_overlay();
 }
 
 // ---------------------------------------------------------------- raw HID -
@@ -230,7 +245,7 @@ static void hc_handle_hid(uint8_t *data) {
             via_update_custom_config(&hc_scene, HC_EEPROM_OFFSET, sizeof(hc_scene));
             break;
         case HC_RELOAD:
-            hc_load();
+            hc_load(false);
             break;
         case HC_DEFAULTS:
             hc_scene_defaults(&hc_scene);
@@ -276,7 +291,14 @@ bool via_command_kb(uint8_t *data, uint8_t length) {
     return true;
 }
 
-// Test hook (host builds only use it; harmless on the keyboard)
+#ifdef HC_HOST_TEST
+// Hooks for the PC build in tests/ (host_device.c); not compiled into the firmware.
 hc_scene_t *hc_debug_scene(void) {
     return &hc_scene;
 }
+
+void hc_debug_reboot(void) {
+    hc_inited = false;
+    hc_init();
+}
+#endif

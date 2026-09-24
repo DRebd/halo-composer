@@ -25,3 +25,4 @@ static inline bool rgb_matrix_check_finished_leds(uint8_t led_max) { return led_
 uint32_t via_read_custom_config(void *buf, uint32_t offset, uint32_t length);
 uint32_t via_update_custom_config(const void *buf, uint32_t offset, uint32_t length);
 void raw_hid_send(uint8_t *data, uint8_t length);
+void eeconfig_init_via(void);

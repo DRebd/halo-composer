@@ -7,6 +7,9 @@
 #include "../default/keymap.c"
 #include "composer/hc_qmk.h"
 
+// tools/make_via_json.py appends Composer as entry 43 of VIA's Effect dropdown.
+_Static_assert(RGB_MATRIX_CUSTOM_composer == 43, "Composer moved in the RGB matrix mode list; update make_via_json.py");
+
 // clang-format off
 led_config_t g_led_config = {
     {

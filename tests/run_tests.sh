@@ -19,7 +19,7 @@ cc -O2 -std=c11 -Wall -Wextra -I"$FW" host_vectors.c "$FW/hc_engine.c" "$FW/hc_b
 node parity_test.mjs "$OUT/vectors.json"
 
 echo "== 3. fake keyboard (the real hc_qmk.c protocol code, built for this PC)"
-cc -O1 -std=c11 -Wall -Wextra -Werror -Ihoststub -I"$FW" host_device.c "$FW/hc_qmk.c" "$FW/hc_engine.c" "$FW/hc_board_geometry.c" -o "$OUT/host_device"
+cc -O1 -std=c11 -Wall -Wextra -Werror -DHC_HOST_TEST -Ihoststub -I"$FW" host_device.c "$FW/hc_qmk.c" "$FW/hc_engine.c" "$FW/hc_board_geometry.c" -o "$OUT/host_device"
 python3 protocol_test.py "$OUT/host_device"
 
 echo "== 4. build Halo Studio"

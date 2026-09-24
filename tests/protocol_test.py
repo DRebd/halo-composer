@@ -43,6 +43,15 @@ class FakeKeyboard:
     def key(self, row, col):
         assert self._ask(f"KEY {row} {col}") == "ok"
 
+    def via_resets(self):
+        return int(self._ask("VIARESETS"))
+
+    def corrupt_saved_scene(self):
+        assert self._ask("EECORRUPT") == "ok"
+
+    def reboot(self):
+        assert self._ask("REBOOT") == "ok"
+
     def close(self):
         self.p.stdin.close()
         self.p.wait(5)
@@ -51,10 +60,25 @@ class FakeKeyboard:
 def main():
     kb = FakeKeyboard(sys.argv[1])
     c = hp.Composer(kb)
+    first_boot_resets = kb.via_resets()
     results = composer_checks.run_all(c, destructive=True)
 
     def check(name, ok, detail=""):
         results.append((name, bool(ok), detail))
+
+    # ---- EEPROM layout guard (hc_load at boot)
+    check("first boot on blank EEPROM resets VIA keymap storage once", first_boot_resets == 1, str(first_boot_resets))
+    c.save()
+    kb.reboot()
+    check("reboot with a valid saved scene keeps VIA keymaps", kb.via_resets() == 1, str(kb.via_resets()))
+    kb.corrupt_saved_scene()
+    kb.reboot()
+    check("reboot after other firmware's EEPROM resets VIA keymaps", kb.via_resets() == 2, str(kb.via_resets()))
+    check("...and loads + saves the default scene", kb.eeprom()[0] == 0xC7 and kb.eeprom() == kb.scene())
+    c.cmd(hp.SET_COLORS, [0, 1, 1, 2, 3])
+    kb.corrupt_saved_scene()
+    c.reload()
+    check("RELOAD of a bad saved scene never touches VIA keymaps", kb.via_resets() == 2, str(kb.via_resets()))
 
     # ---- checks only the fake can do
     c.defaults()

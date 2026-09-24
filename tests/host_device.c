@@ -5,6 +5,9 @@
 //   "EEPROM"          -> prints the EEPROM copy of the scene as hex
 //   "FRAME <t>"       -> renders one frame at time t, prints 384 bytes as hex
 //   "KEY <row> <col>" -> key press through hc_process_key
+//   "VIARESETS"       -> how many times the firmware reset VIA's keymap storage
+//   "REBOOT"          -> re-run the boot-time init (EEPROM kept)
+//   "EECORRUPT"       -> clobber the saved scene's magic byte (simulates other firmware's EEPROM)
 #include <stdio.h>
 #include <stdlib.h>
 #include "quantum.h"
@@ -38,6 +41,9 @@ void side_composer_overlay(void) {}
 bool via_command_kb(uint8_t *data, uint8_t length);
 static void hex(const uint8_t *b, size_t n) { for (size_t i = 0; i < n; i++) printf("%02x", b[i]); printf("\n"); fflush(stdout); }
 void raw_hid_send(uint8_t *data, uint8_t length) { hex(data, length); }
+static unsigned via_resets = 0;
+void eeconfig_init_via(void) { via_resets++; }
+extern void hc_debug_reboot(void);
 extern hc_scene_t *hc_debug_scene(void);
 
 int main(void) {
@@ -48,6 +54,9 @@ int main(void) {
         if (!strncmp(line, "SCENE", 5)) { hex((const uint8_t *)hc_debug_scene(), sizeof(hc_scene_t)); continue; }
         if (!strncmp(line, "EEPROM", 6)) { hex(eeprom + NUPHY_VIA_EEPROM_CUSTOM_CONFIG_SIZE, sizeof(hc_scene_t)); continue; }
         if (!strncmp(line, "FRAME", 5)) { g_rgb_timer = (uint32_t)strtoul(line + 6, NULL, 10); effect_params_t p = {0, 0xFF, false}; hc_rgb_effect(&p); hex(fb, sizeof fb); continue; }
+        if (!strncmp(line, "VIARESETS", 9)) { printf("%u\n", via_resets); fflush(stdout); continue; }
+        if (!strncmp(line, "EECORRUPT", 9)) { eeprom[NUPHY_VIA_EEPROM_CUSTOM_CONFIG_SIZE] = 0x00; printf("ok\n"); fflush(stdout); continue; }
+        if (!strncmp(line, "REBOOT", 6)) { hc_debug_reboot(); printf("ok\n"); fflush(stdout); continue; }
         if (!strncmp(line, "KEY", 3)) { unsigned r, c; sscanf(line + 4, "%u %u", &r, &c); hc_process_key((uint8_t)r, (uint8_t)c, true); printf("ok\n"); fflush(stdout); continue; }
         uint8_t pkt[32] = {0};
         for (int i = 0; i < 32; i++) { unsigned v; if (sscanf(line + i * 2, "%2x", &v) != 1) break; pkt[i] = (uint8_t)v; }
