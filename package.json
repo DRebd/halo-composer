@@ -1,0 +1,12 @@
+{
+  "name": "halo-composer",
+  "private": true,
+  "description": "Test tooling for Halo Composer (Playwright drives Halo Studio in end-to-end tests)",
+  "license": "GPL-2.0-or-later",
+  "scripts": {
+    "test": "bash tests/run_tests.sh"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

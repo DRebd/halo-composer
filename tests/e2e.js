@@ -1,4 +1,4 @@
-// End-to-end test: run tools/run_tests.sh (needs Node + Playwright with Chromium)
+// Run via tests/run_tests.sh (needs Node + Playwright with Chromium).
 // End-to-end: Halo Studio (real page) <-> fake WebHID <-> real firmware protocol code (host build)
 const { chromium } = require('playwright');
 const { spawn } = require('child_process');
@@ -32,7 +32,8 @@ let packets = 0;
     hid.requestDevice = async () => [d]; hid.getDevices = async () => [d];
     Object.defineProperty(navigator, 'hid', { value: hid });
   });
-  await p.goto('file://' + path.join(__dirname, 'halo-studio.html'));
+  const html = process.env.STUDIO_HTML || path.join(__dirname, '..', 'dist', 'halo-studio.html');
+  await p.goto('file://' + html);
   await p.waitForTimeout(500);
   const sceneHex = () => p.evaluate(() => Array.from(HC.sceneToBytes(HaloStudio.state.scene), (x) => x.toString(16).padStart(2, '0')).join(''));
   const report = [];
@@ -66,8 +67,11 @@ let packets = 0;
   const fw = await ask('FRAME ' + t);
   const gui = await p.evaluate((t) => { const e = new HC.HcEngine(HaloStudio.engine.keyXY); const out = new Uint8Array(384); e.renderFrame(HaloStudio.state.scene, t, { keys: 255, halo: 255 }, out); return Array.from(out, (x) => x.toString(16).padStart(2, '0')).join(''); }, t);
   report.push(`${fw === gui ? 'PASS' : 'FAIL'}  frame at t=${t}: firmware glue render == GUI preview render`);
-    console.log(report.join('\n'));
+  console.log(report.join('\n'));
   console.log(`HID packets exchanged: ${packets}`);
   console.log(errs.length ? errs.join('\n') : 'no page errors');
   await b.close(); dev.kill();
-})();
+  const failed = report.filter((l) => l.startsWith('FAIL')).length;
+  if (failed || errs.length) { console.error(`E2E FAILED: ${failed} check(s), ${errs.length} page error(s)`); process.exit(1); }
+  console.log('E2E OK');
+})().catch((e) => { console.error('E2E crashed:', e); dev.kill(); process.exit(1); });
