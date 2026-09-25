@@ -1,121 +1,138 @@
-# Flashing guide and bring-up checklist
+# Installing Halo Composer
 
-"Flashing" means replacing the program inside the keyboard. This guide does it in two stages and checks each one. It also covers going back to NuPhy's original firmware. **Plan on 20–30 minutes at the keyboard.** Claude Code can run the command-line checks, but a few steps need your hands.
+This guide puts the Halo Composer firmware on a NuPhy Halo75 V2, checks that it works, and covers updating to a new release later.
+
+- **Firmware** is the small program that runs inside the keyboard. It reads the keys and drives the lights.
+- **Flashing** means replacing that program with a new file (a `.bin`). It's reversible: you can always flash NuPhy's original firmware back.
+
+> [!IMPORTANT]
+> **Status:** Halo Composer is a very new project. It works on the developer's Halo75 V2 ANSI but has had little testing beyond that. Only the **ANSI** Halo75 V2 (the US-style layout, with a wide, single-row Enter key) is supported. Don't flash it onto any other model.
+
+## What you need
+
+- A **NuPhy Halo75 V2, ANSI version**.
+- Its **USB-C cable**. Flashing only works over the cable.
+- A **Windows or macOS computer**.
+- **QMK Toolbox**, a free flashing app. QMK is the open-source keyboard firmware the Halo75 V2 runs. [Step 1](#step-1-install-qmk-toolbox) covers installing it.
+- These files from the latest release on the project's **[Releases page](https://github.com/DRebd/halo-composer/releases)** (listed under *Assets*):
+
+| File | What it is |
+|---|---|
+| `nuphy_halo75v2_ansi_composer.bin` | The firmware. This is the file you flash. |
+| `halo75v2_composer_via3.json` | The VIA definition. VIA is a web app for remapping keys; you only need this file if you use it (see [step 4](#step-4-check-that-it-worked)). |
+| `SHA256SUMS.txt` | Checksums, to confirm the download isn't damaged (optional, below). |
+
+### Optional: check the download
+
+A checksum is a fingerprint of a file. If yours matches the one in `SHA256SUMS.txt`, the file arrived intact.
+
+- **Windows:** open the Start menu, type `cmd`, press Enter, and run:
+
+  ```
+  cd Downloads
+  certutil -hashfile nuphy_halo75v2_ansi_composer.bin SHA256
+  ```
+
+- **macOS:** open Terminal (Applications → Utilities) and run:
+
+  ```
+  cd ~/Downloads
+  shasum -a 256 nuphy_halo75v2_ansi_composer.bin
+  ```
+
+Compare the long string it prints with the one next to `nuphy_halo75v2_ansi_composer.bin` in `SHA256SUMS.txt` (open that file in Notepad or TextEdit). Capital and small letters count as the same. If the two strings differ, download the file again.
 
 ## Before you start
 
-- **Your settings get reset.** Entering flashing mode by holding Esc wipes the keyboard's saved settings: VIA key changes, lighting, and the Composer scene. Your layout is already backed up: `backups/stock-2.1.5_2026-09-23_2346.json`. It's NuPhy's factory layout, so nothing needs restoring. Bluetooth pairings are stored in the separate wireless chip and *should* survive (unverified).
-- **Close VIA and Halo Studio** (every tab). Two programs talking to the keyboard at once cause the "incorrect response" errors you saw before.
-- **Use the USB-C cable, with the mode switch on the back set to wired.** Flashing and the editor only work over the cable.
-- **Hardware recovery button:** remove the **Caps Lock** keycap. There's a small black button next to its switch; hold it while plugging in the cable to force flashing mode even if the firmware won't start. This is documented in ryodeushii's readme and his recovery instructions (`keyboards/nuphy/halo75v2/ansi/readme.md`, `keyboards/nuphy/instructions.md`). It isn't on NuPhy's page.
-- The two unexplained NuPhy keys on **Fn+M+R** and **Fn+M+T** won't exist after flashing. They aren't in any published source code.
+- **Flashing resets the keyboard's saved settings.** Holding Esc to enter flashing mode ([step 2](#step-2-put-the-keyboard-in-flashing-mode)) wipes all of them: key changes made in VIA, lighting settings, and the Composer scene (the saved look). A new keyboard has nothing to lose. If you've remapped keys in VIA, note your changes so you can redo them.
+- **Bluetooth pairings** are kept in the keyboard's separate wireless chip and should survive, but this hasn't been confirmed. Be ready to pair your devices again.
+- **Close VIA and Halo Studio**, including every Studio tab. Two programs talking to the keyboard at once confuse each other.
+- **Set the mode switch on the back to wired** and use the USB-C cable.
+- **Allow about half an hour** the first time. Later updates take a few minutes.
 
-## Part 1: one-time setup
+If anything goes wrong, there's a hardware recovery button under the Caps Lock keycap (see [step 2](#step-2-put-the-keyboard-in-flashing-mode)), and NuPhy's original firmware can always be flashed back (see [Other firmware](#other-firmware)).
 
-1. **Install QMK Toolbox**, the free flashing app that NuPhy's own instructions use. Download `qmk_toolbox_install.exe` from https://github.com/qmk/qmk_toolbox/releases (0.3.4 as of 2026-09-24) and run it. It installs USB drivers for flashing mode, which needs one **admin approval** prompt.
-2. **Download NuPhy's official firmware** as your way back: [QMK_firmware_nuphy_halo75_v2_ansi_v2.1.5.bin](https://cdn.shopify.com/s/files/1/0268/7297/1373/files/QMK_firmware_nuphy_halo75_v2_ansi_v2.1.5.bin?v=1741067981). It's listed on https://nuphy.com/pages/qmk-firmwares. Keep it somewhere safe.
-3. **Get the two files to flash.** Claude Code builds them into this project's `dist\` folder with `.\scripts\build-firmware.ps1`:
-   - `nuphy_halo75v2_ansi_via.bin`: ryodeushii's firmware, unmodified (stage 1)
-   - `nuphy_halo75v2_ansi_composer.bin`: Halo Composer (stage 2)
+## Step 1: Install QMK Toolbox
 
-   The same files also come from each automatic build on GitHub (Actions tab → latest run → *firmware-UNTESTED-on-hardware*).
+QMK Toolbox is the free flashing app that NuPhy's own instructions also use. Download it from the *Assets* of the latest release at https://github.com/qmk/qmk_toolbox/releases.
 
-## Part 2: how to flash (every time)
+- **Windows** (Windows 10 version 20H1 or later): download and run `qmk_toolbox_install.exe`. The first time QMK Toolbox starts, it asks *"Would you like to install drivers for your devices?"* Click **Yes** and approve the administrator prompt. These drivers let Windows talk to the keyboard in flashing mode.
+- **macOS** (macOS 12 Monterey or later): download `QMK.Toolbox.pkg` and open it. If you use Homebrew (a command-line app installer for macOS), `brew install qmk-toolbox` does the same. Macs don't need the driver step.
 
-These are NuPhy's official steps (https://nuphy.com/pages/update-instructions, updated 2026-09-09) with notes added:
+## Step 2: Put the keyboard in flashing mode
 
-1. Unplug the keyboard and set the switch to **wired**.
-2. Open **QMK Toolbox** → **File → Open** → pick the `.bin` file.
-3. **Hold Esc**, keep holding it, and plug in the USB cable. Release Esc when **yellow text** appears in the Toolbox window saying a DFU device connected. The keyboard stops typing while it's in this mode; that's expected.
-   - No yellow text? Unplug and try again, holding Esc *before* the cable goes in. If the Toolbox shows **(NO DRIVER)**, the flashing driver is missing: press **Ctrl+N** in QMK Toolbox to install it (approve the admin prompt; if nothing happens, run QMK Toolbox as Administrator), then retry. This comes from ryodeushii's flashing instructions.
-4. Click **Flash**. Wait for **"Flash complete"**. Don't unplug during flashing.
-5. Unplug and re-plug, then type a few characters to check it works.
+Flashing mode, also called **DFU** (Device Firmware Update) mode, is a special state where the keyboard stops typing and waits for new firmware.
 
-## Part 3: bring-up checklist
+1. Open **QMK Toolbox**.
+2. Unplug the keyboard and set its switch to **wired**.
+3. **Hold Esc**, keep holding it, and plug in the USB cable.
+4. Release Esc when **yellow text** appears in the QMK Toolbox window saying a DFU device connected, for example `STM32 DFU device connected (WinUSB): ...`. On a Mac in light mode the text looks orange. The keyboard doesn't type in this mode; that's expected.
 
-Tick each item. If something fails, stop and note what you saw. Claude Code can compare it against the code.
-Lines that start with **Claude Code:** are commands Claude Code runs for you from this project folder; you don't run them yourself.
+**No yellow text?** Unplug and try again, making sure you're holding Esc *before* the cable goes in.
 
-### Stage 1: ryodeushii's firmware alone (`nuphy_halo75v2_ansi_via.bin`)
+**Shows `(NO DRIVER)`?** (Windows only.) The flashing driver is missing. In QMK Toolbox choose **Tools → Install Drivers...** (or press **Ctrl+N**) and approve the administrator prompt. If it says it needs administrator rights, close QMK Toolbox, right-click it, choose **Run as administrator**, and try again.
 
-This checks the base firmware on your keyboard before any of our code is involved.
+**Fallback: the hardware recovery button.** If holding Esc never works, for example after a failed flash, pull off the **Caps Lock** keycap. Next to its switch is a small black button. Hold it while you plug in the cable. This forces flashing mode even if the firmware won't start. It comes from ryodeushii's flashing instructions; NuPhy doesn't document it.
 
-- [ ] Flash it (Part 2). Typing works, including Fn layer keys (for example Fn+F1 on Mac mode / media keys).
-- [ ] Key lighting responds: Fn+↑/↓ brightness, Fn+← next effect.
-- [ ] Halo responds: Fn+M+↑/↓ brightness, Fn+M+← halo mode.
-- [ ] Caps Lock indicator and the Win/Mac switch behave as before.
-- [ ] Optional: switch to 2.4 GHz or Bluetooth, type a sentence, and switch back to wired.
-- [ ] Claude Code: `python tools\halo_kb.py info` shows the protocol version and 8 layers.
+## Step 3: Flash the firmware
 
-### Stage 2: Halo Composer (`nuphy_halo75v2_ansi_composer.bin`)
+1. In QMK Toolbox, click **Open** and pick `nuphy_halo75v2_ansi_composer.bin`. You can ignore the other settings, such as *MCU (AVR only)*, which is for a different kind of chip.
+2. Click **Flash**. Don't unplug the cable until the yellow text says **Flash complete**.
+3. Unplug the keyboard, plug it back in, and type a few characters to check that it works.
 
-- [ ] Flash it. Typing works.
-- [ ] **Composer starts on by itself** after this flash. If it isn't showing, press **Fn+Enter**, which jumps straight to Composer (builds from 2026-09-25 on), or have Claude Code run `python tools\halo_kb.py on`.
-- [ ] **Default look:** 2700K warm-white keys; the key you press flashes mint (#70FF94) for about half a second and sends a mint ripple about two keys outwards; a 2700K halo breathing between 30% and 100% (one breath is about 4.7 s). *(Builds before 2026-09-25 had a warm-white/amber look.)*
-- [ ] **Stock effects still work:** Fn+← steps forward through the effect list (Solid Color, ...) and the halo shows NuPhy's own modes again; Fn+Shift+← steps backwards. Composer is the last of 43 entries, so stepping only returns to it after going round. **Fn+Enter** jumps back to Composer from anywhere, and pressing it again returns to the stock effect you were on.
-- [ ] **Brightness keys:** Fn+↑/↓ changes the keys, Fn+M+↑/↓ changes the halo (6 steps). Turn the keys all the way down: the halo must **stay lit** (this tests the LED-power patch).
-- [ ] **Indicators on top:** Caps Lock turns the Caps key and the status bar **magenta** (Fn+Caps cycles bar / key / both / off), Fn+\ shows the battery, and flipping the Win/Mac switch shows its indicator. None of them flicker, and they disappear cleanly.
-- [ ] **Boot animation:** unplug and re-plug. NuPhy's power-on sweep plays around the halo, then Composer takes over without a glitch.
-- [ ] Claude Code: `python tools\halo_kb.py status`. The frame rate should be **≥ 25 fps**.
-- [ ] Claude Code: `python tools\halo_kb.py selftest`. All checks should pass. It only uses the keyboard's temporary memory and puts everything back.
-- [ ] **VIA still works:** in VIA, load `dist\halo75v2_composer_via3.json` as a draft definition in the Design tab, the same way you loaded NuPhy's file before. Key remapping works, and the Effect list ends with "Composer (Halo Studio)". **Close VIA afterwards.**
+The keyboard now starts from scratch. Its VIA key changes, lighting settings and Composer scene are all back to their defaults, and Composer's factory look is running.
 
-### Stage 3: Halo Studio with the keyboard
+## Step 4: Check that it worked
 
-- [ ] Open **https://drebd.github.io/halo-composer/** in Chrome or Edge → **Connect keyboard** → pick the NuPhy entry in the browser's pop-up. The pill at the top reads "Connected · Composer on".
-- [ ] **Calibrate the halo** (Halo setup tab → Start placing). One amber LED lights up on the keyboard. Click where it is on the drawing and repeat (Skip any you can't see; LEDs 9, 10 and 45 have no LED fitted and are skipped automatically). Then **Walk the ring**, check the order goes smoothly around, and click **Save to keyboard**. *Since 2026-09-25 the built-in positions are the ones measured on your keyboard, so this is only needed if something looks off.*
-- [ ] Claude Code: `python tools\halo_kb.py scene-backup backups\calibrated.halo.json` (nothing for you to do). This keeps the calibration safe across future flashes.
-- [ ] Try a few **starter scenes** (Scenes tab). *Typing Ripples* is the heaviest. While it runs, type fast: typing must never lag. Then measure again with Device → *Measure keyboard frame rate*. It should stay ≥ 25 fps.
-- [ ] **Persistence:** Save, unplug, re-plug. The saved scene comes back, and VIA key changes (if any) are still there.
-- [ ] **Wireless and sleep:** switch to 2.4 GHz / Bluetooth. Lighting keeps running, and Studio can't connect (expected, since it's USB only). Let the keyboard sleep and wake it: the lighting comes back.
-- [ ] **Battery (over a day):** compare battery drain with the halo on against what you're used to.
+- **The factory look shows.** The keys glow warm white (2700K, like a warm incandescent bulb). When you press a key, it flashes mint green for about half a second and a mint ripple spreads about two keys around it. The halo, the light strip around the base, is the same warm white and breathes slowly between 30% and 100%.
+- **Fn+Enter** switches between Composer and the keyboard's stock effects. Right after a flash, the stock effect is Solid Color. Press Fn+Enter again to come back.
+- **Brightness:** Fn+↑/↓ changes the keys, and Fn+M+↑/↓ changes the halo (hold Fn and M, then press the arrow). Turn the keys all the way down: the halo should stay lit.
+- **Caps Lock** lights the Caps key and the status bar magenta.
+- **Optional, if you use VIA.** VIA ([usevia.app](https://usevia.app), in Chrome or Edge) is a web app for remapping keys. It needs a *definition* file that describes this firmware:
+  1. In VIA, open the **Settings** tab and turn on **Show Design tab**.
+  2. Open the **Design** tab. Next to **Load Draft Definition**, click **Load** and pick `halo75v2_composer_via3.json`.
+  3. In the **Configure** tab, under **Lighting**, the **Effect** list now ends with **Composer (Halo Studio)**. The Fn+Enter key shows as **Composer On/Off**.
+  4. **Close VIA** when you're done. VIA and Halo Studio can't use the keyboard at the same time.
 
-When everything is ticked, tell Claude Code.
+## Next: open Halo Studio
 
-### Results (2026-09-25)
+Open **https://drebd.github.io/halo-composer/** in **desktop Chrome or Edge**. These browsers support WebHID, the feature that lets a web page talk to a USB device after you pick it in a pop-up. Click **Connect keyboard** and pick the NuPhy entry. The pill at the top should read **Connected · Composer on**. Then read the [User guide](USER_GUIDE.md) to make the look your own.
 
-Stages 1–3 passed on your keyboard. Only the day-long battery comparison is still open.
+The halo layout is built in, so you only need to calibrate if halo effects don't line up (see [Halo setup](USER_GUIDE.md#halo-setup-calibration)).
 
-- Self-test on the keyboard: 27/27. Frame rate: **40 fps**, which is the firmware's fixed ceiling. It drops to **30 fps** with the heaviest reactive scene while 31 key presses per second are simulated (2–3× the fastest human typing).
-- Halo calibration done. LEDs 9, 10 and 45 have no LED fitted. The measured positions are now the built-in defaults.
-- Changes made from your notes, all in the 2026-09-25 update:
-  - Fn+Enter jumps to Composer;
-  - Caps Lock turns magenta on the key and the status bar;
-  - a new default look;
-  - Studio fixes (color picker, zone cards, bezels, hidden unfitted LEDs, true-to-LED preview).
+## Updating to a new release
 
-### Stage 4: after flashing the 2026-09-25 update
+Flashing resets the keyboard's saved settings, so save your look first.
 
-- [ ] Flash `nuphy_halo75v2_ansi_composer.bin` with Esc held (Part 2). Typing works.
-- [ ] The default look matches Stage 2, and halo effects line up without recalibrating.
-- [ ] **Fn+Enter** switches between Composer and the stock effect you were last on (Solid Color right after a flash).
-- [ ] **Caps Lock** lights the Caps key and the status bar magenta.
-- [ ] In VIA, with the new `dist\halo75v2_composer_via3.json`, the Fn+Enter key shows as "Composer On/Off", and Fn+Ins shows as "Toggle Power On Animation".
-- [ ] Claude Code: `python tools\halo_kb.py selftest`.
+1. **Export your scene.** Open Halo Studio, click **Connect keyboard**, go to the **Scenes** tab, type a name, and click **Export current as file**. This downloads a `.halo.json` file.
+2. **If you've remapped keys in VIA**, save them too: in VIA's **Configure** tab, open **Save + Load** and click **Save** next to **Save Current Layout**.
+3. **Close Studio and VIA**, download the new release's files, and flash the new `nuphy_halo75v2_ansi_composer.bin` exactly as in [step 2](#step-2-put-the-keyboard-in-flashing-mode) and [step 3](#step-3-flash-the-firmware).
+4. **Bring your look back.** Reload the Halo Studio page so you have its newest version, and connect. On the **Scenes** tab, click **Import file…**, pick your file, then click **Save to keyboard**.
+5. **If you use VIA**, load the new release's `halo75v2_composer_via3.json` (as in [step 4](#step-4-check-that-it-worked)). Then use **Save + Load** → **Load Saved Layout** to restore your keys.
 
-**Stage 4 result (2026-09-25):** passed. You confirmed the look, Fn+Enter, Caps Lock and VIA. Claude Code read Fn+Enter = `HC_TOGGLE` (0x7E2D) on both Fn layers and 1,485 bytes of macro space from the keyboard; self-test 27/27 at 40 fps. These are the files to publish as the first tagged release.
+Importing a scene in Studio keeps the halo layout that's already in the editor, which after a flash is the built-in one. If you calibrated the halo yourself, calibrate again after importing, or use the command-line tool below, which restores the calibration too.
 
-## Part 4: going back to NuPhy's original firmware
+*Optional, if you're comfortable with Python (a programming language) and the command line:* with a copy of this repository and the USB library installed (`pip install hidapi`), run `python tools/halo_kb.py scene-backup before-update.halo.json` before flashing and `python tools/halo_kb.py scene-restore before-update.halo.json --save` afterwards. See [DEVELOPING.md](DEVELOPING.md).
 
-Flash `QMK_firmware_nuphy_halo75_v2_ansi_v2.1.5.bin` using Part 2. Then load NuPhy's VIA definition (`nuphy-halo75-v2-via.json`, in your Downloads) in VIA as before. The halo shortcuts in [USER_GUIDE.md](USER_GUIDE.md#keyboard-shortcuts) that are marked *stock* apply again.
+## Other firmware
 
-## Part 5: updating Composer later
+**Only want ryodeushii's improvements, without Composer?** Halo Composer is built on [ryodeushii's firmware](https://github.com/ryodeushii/qmk-firmware), a community-improved version of NuPhy's firmware ([what it changes](WHATS_DIFFERENT.md)). On its own, it's a stable base with no Composer. Ready-made files are on [his Releases page](https://github.com/ryodeushii/qmk-firmware/releases). At the time of writing, his newest release is **ryo-1.1.4** from September 2024. It includes a Halo75 V2 build, `halo75v2-via-ryo-1.1.4.bin`, and its VIA definition, `NuPhy.Halo75v2.via3.json`. His code has changed since then, and Halo Composer builds on a newer version, but those newer versions aren't published as ready-made files. Flash his `.bin` the same way as above.
 
-1. `python tools\halo_kb.py scene-backup backups\before-update.halo.json`
-2. Flash the new `nuphy_halo75v2_ansi_composer.bin` (Part 2).
-3. `python tools\halo_kb.py on`, then `python tools\halo_kb.py scene-restore backups\before-update.halo.json --save`
-
-Or in Studio: **Scenes → My scenes** keeps everything you saved in that browser, including the auto-backup made each time you connect.
+*To return to NuPhy's original firmware, flash NuPhy's official file the same way. See [NuPhy's update instructions](https://nuphy.com/pages/update-instructions), or download [v2.1.5 for the Halo75 V2 ANSI](https://cdn.shopify.com/s/files/1/0268/7297/1373/files/QMK_firmware_nuphy_halo75_v2_ansi_v2.1.5.bin?v=1741067981) directly.*
 
 ## Troubleshooting
 
-| Symptom | Likely cause and fix |
+| What you see | Likely cause and fix |
 |---|---|
-| No yellow "DFU" text in QMK Toolbox | Esc wasn't held before the cable went in, the switch isn't on wired, or the driver is missing (see Part 2, step 3) |
-| Keyboard doesn't type after flashing | Unplug and re-plug. If it's still dead, flash NuPhy's `.bin` (Part 4). If Esc-hold no longer reaches flashing mode (Esc-hold is detected by the firmware itself), use the hardware recovery button: remove the Caps Lock keycap, hold the small black button next to its switch, and plug in. |
-| Studio says "not running the Halo Composer firmware" | The keyboard is still on stock or ryodeushii `via` firmware. Flash `...composer.bin` |
-| Studio "timeout" or VIA "Receiving incorrect response" | Another tab or app is using the keyboard. Close VIA and other Studio tabs, then reconnect |
-| Keys dark but the halo lit, or the reverse | Brightness: Fn+↑ for keys, Fn+M+↑ for the halo. In Studio, check the zone's Min/Max brightness |
-| A stock effect is showing instead of your Composer look | Press **Fn+Enter** |
-| Composer look gone after unplugging | The scene wasn't saved. In Studio press **Save to keyboard** |
-| Everything reset after holding Fn+[ | That's NuPhy's factory reset (hold 3 s). It also resets the Composer scene. Restore with `scene-restore --save` |
+| No yellow "DFU device connected" text in QMK Toolbox | Esc wasn't held before the cable went in, the switch isn't on wired, or (on Windows) the driver is missing. See [step 2](#step-2-put-the-keyboard-in-flashing-mode). |
+| QMK Toolbox shows **(NO DRIVER)** | Windows only. Choose **Tools → Install Drivers...** (Ctrl+N) and approve the prompt. If that fails, run QMK Toolbox as administrator. |
+| The keyboard doesn't type after flashing | Unplug it and plug it back in. If it still doesn't type, flash again. If holding Esc no longer reaches flashing mode, use the recovery button under the Caps Lock keycap ([step 2](#step-2-put-the-keyboard-in-flashing-mode)), then flash this firmware or NuPhy's. |
+| A stock effect is showing | Press **Fn+Enter**. |
+| Keys dark but the halo lit, or the reverse | Brightness: Fn+↑ for the keys, Fn+M+↑ for the halo. In Studio, check the zone's Min bright and Max bright. |
+| Your Composer look is gone after unplugging | It wasn't saved. In Studio, click **Save to keyboard**. |
+| Everything reset after holding Fn+[ | That's the factory reset (hold about 3 seconds). It resets the Composer scene too. In Studio, import your exported scene and click **Save to keyboard**. |
+| Studio says your keyboard "is not running the Halo Composer firmware" | It's still on NuPhy's or ryodeushii's firmware. Flash `nuphy_halo75v2_ansi_composer.bin`. |
+| Studio says "Could not connect" or shows a timeout; VIA says "Receiving incorrect response" | Another tab or app is using the keyboard. Close VIA and other Studio tabs, then connect again. |
+| Studio says the firmware scene layout "doesn't match this Studio" | The firmware and Studio are from different versions. Flash the latest release and reload the Studio page. |
+| Studio can't find the keyboard, or there's no NuPhy entry in the pop-up | Use desktop Chrome or Edge, set the switch to wired, and use the cable. |
+| Halo waves, comets or ripples don't line up with the halo | In Studio, open **Halo setup**. If it shows a **Custom layout** notice you didn't expect, click **Use built-in layout**, then **Save to keyboard**. Otherwise, calibrate (see [Halo setup](USER_GUIDE.md#halo-setup-calibration)). |

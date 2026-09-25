@@ -78,7 +78,7 @@ let packets = 0;
   const gui = await p.evaluate((t) => { const e = new HC.HcEngine(HaloStudio.engine.keyXY); const out = new Uint8Array(384); e.renderFrame(HaloStudio.state.scene, t, { keys: 255, halo: 255 }, out); return Array.from(out, (x) => x.toString(16).padStart(2, '0')).join(''); }, t);
   report.push(`${fw === gui ? 'PASS' : 'FAIL'}  frame at t=${t}: firmware glue render == GUI preview render`);
 
-  // 8. regressions from the Studio review (docs/PLAN.md)
+  // 8. regressions: bugs found in review, each check fails on the old code
   const ok = (cond, label, detail = '') => report.push(`${cond ? 'PASS' : 'FAIL'}  ${label}${cond || !detail ? '' : '  (' + detail + ')'}`);
   // 8a. buttons act on the current selection even when the panel was drawn before it changed
   await p.click('#tabs button[data-tab=paint]'); await p.click('.sw[title="Cyan"]');

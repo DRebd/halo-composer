@@ -1,5 +1,5 @@
 // Host-side test vector generator for Halo Composer.
-// Build: cc -O2 -std=c11 -I../composer host_vectors.c ../composer/hc_engine.c ../composer/hc_board_geometry.c -o host_vectors
+// Build: see tests/run_tests.sh (cc -I firmware/keymap/composer host_vectors.c hc_engine.c hc_board_geometry.c)
 // Emits JSON consumed by parity_test.mjs, which replays the same inputs through
 // the JavaScript engine and requires byte-identical output.
 #include <stdio.h>

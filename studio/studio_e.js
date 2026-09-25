@@ -50,9 +50,15 @@ function walkRing() {
     state.calib.idx = order[k++]; identify(state.calib.idx);
   }, 380);
 }
+function useBuiltInLayout() { GEOM.halo.forEach((h, i) => { state.scene.haloXY[i * 2] = h.x; state.scene.haloXY[i * 2 + 1] = h.y; state.scene.haloRing[i] = h.ring; }); markGeom(); renderTab(); toast('Built-in halo layout applied. Save to keep it on the keyboard.'); }
 function tabHalo(body) {
   const c = state.calib, g = GEOM.halo[c.idx];
+  // A browser keeps the last editor scene, so an old calibration can outlive a firmware update. Say so.
+  const moved = GEOM.halo.filter((h, i) => !h.absent && (state.scene.haloXY[i * 2] !== h.x || state.scene.haloXY[i * 2 + 1] !== h.y)).length;
   body.append(
+    moved ? el('div', { class: 'banner' }, el('b', {}, 'Custom layout. '), `${moved} halo LED${moved === 1 ? ' sits' : 's sit'} somewhere other than the built-in layout. That's expected if you calibrated your own keyboard. If you didn't, or this came from an older version, switch back: `,
+      el('button', { class: 'btn small', onclick: useBuiltInLayout }, 'Use built-in layout'))
+      : el('p', { class: 'hint' }, 'Using the built-in halo layout.'),
     el('div', { class: 'banner' }, el('b', {}, 'Why calibrate? '), 'NuPhy doesn\'t publish where the halo LEDs sit. The built-in layout was measured on one Halo75 V2 and should fit yours; recalibrate if waves, comets or ripples don\'t line up. LEDs 9, 10 and 45 have no LED fitted, so they are hidden and skipped.'),
     el('div', { class: 'sec' }, el('h3', {}, 'Place each halo LED'),
       el('ol', { class: 'hint', style: 'margin:0;padding-left:18px' },
@@ -68,7 +74,7 @@ function tabHalo(body) {
       el('div', { class: 'row' },
         el('button', { class: 'btn', onclick: walkRing }, 'Walk the ring'),
         el('button', { class: 'btn', onclick: () => { recomputeRing(); toast('Ring order recomputed from positions.'); } }, 'Recompute ring order'),
-        el('button', { class: 'btn ghost', onclick: () => { GEOM.halo.forEach((h, i) => { state.scene.haloXY[i * 2] = h.x; state.scene.haloXY[i * 2 + 1] = h.y; state.scene.haloRing[i] = h.ring; }); markGeom(); renderTab(); } }, 'Reset to defaults')),
+        el('button', { class: 'btn ghost', onclick: useBuiltInLayout }, 'Use built-in layout')),
       el('p', { class: 'hint' }, '"Walk the ring" lights the halo one LED at a time in ring order (on the keyboard and in the preview). Comets and the Ring axis follow this order.')),
   );
 }

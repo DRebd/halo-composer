@@ -1,20 +1,22 @@
 # How it works
 
-A technical reference for the firmware engine, the USB protocol, the scene format and the editor. This is adapted from the original handoff (`chat-handoff/HALO_COMPOSER.md`, sections 3–7) and updated for the changes made since.
+A technical reference for the Halo Composer firmware engine, its USB protocol, the scene format and storage, and the Halo Studio editor. For building and testing, see [DEVELOPING.md](DEVELOPING.md). Terms such as QMK, VIA, EEPROM and WebHID are explained in the README's [plain-English glossary](../README.md#plain-english-glossary).
+
+Paths that start with `keyboards/` or `quantum/` are in ryodeushii's firmware at the commit pinned in `firmware/base.env`. All other paths are in this repository.
 
 ## Hardware facts and budgets
 
 | Item | Value | Source |
 |---|---|---|
-| MCU (the keyboard's processor) | STM32F072: Cortex-M0 at 48 MHz, **no floating point, no hardware divide**, 128 KB flash, 16 KB RAM | ryodeushii tree |
-| LED drivers | 2 × IS31FL3733 (I²C 0x50/0x53 at 1 MHz), 64 RGB LEDs each, 8-bit PWM | `keyboards/nuphy/halo75v2/ansi/config.h` |
-| LEDs | 0–82 per-key; **83–127 "halo" (45)**: 83–87 status bar, 88–127 underglow ring and badge | `side.c` |
-| Halo physical positions | **Measured** on a real Halo75 V2 with the calibration wizard (2026-09-25) and built into the defaults. LEDs 9, 10 and 45 (indices 91, 92, 127) have no LED fitted: Studio hides them and ring order ignores them | `tools/gen_geometry.py` (`CALIBRATED`, `ABSENT`) |
-| Frame pacing | QMK RGB matrix: flush every 25 ms (~40 fps), rendering split across main-loop passes. Measured on the keyboard: 40 fps; 30 fps with ripples under 31 simulated key presses per second | `keyboard.json`, `halo_kb.py status` |
-| Raw HID | 32-byte reports, **USB only**. The wireless module carries only keyboard, mouse and consumer reports | `rf_protocol.h` |
-| Flash use | `via` build 74,328 B · `composer` build 83,120 B (GCC 15.2) | `scripts/build-firmware.ps1` |
+| MCU (the keyboard's processor) | STM32F072: Cortex-M0 at 48 MHz, **no floating point, no hardware divide**, 128 KB flash, 16 KB RAM | ryodeushii's tree |
+| LED drivers | 2 × IS31FL3733 (I²C addresses 0x50/0x53 at 1 MHz), 64 RGB LEDs each, 8-bit PWM (brightness levels) | `keyboards/nuphy/halo75v2/ansi/config.h` |
+| LEDs | 0–82 per-key; **83–127 "halo" (45)**: 83–87 status bar, 88–127 underglow ring and badge | `keyboards/nuphy/halo75v2/ansi/side.c` |
+| Halo physical positions | **Measured** on the developer's Halo75 V2 with Studio's calibration wizard and built into the defaults. Halo LEDs 9, 10 and 45 (indices 91, 92, 127) have no LED fitted: Studio hides them and ring order ignores them | `tools/gen_geometry.py` (`CALIBRATED`, `ABSENT`) |
+| Frame pacing | QMK RGB matrix: flush every 25 ms (40 fps ceiling), rendering split across main-loop passes (4 LEDs per pass). Measured on the keyboard: 40 fps; about 30 fps with the heaviest reactive scene under 31 simulated key presses per second | `keyboards/nuphy/halo75v2/ansi/keyboard.json` (`led_flush_limit`, `led_process_limit`), `tools/halo_kb.py status` |
+| Raw HID (the USB channel VIA and Studio use) | 32-byte reports, **USB only**. The wireless module carries only keyboard, mouse and media-key reports | `keyboards/nuphy/common/wireless/rf_protocol.h` |
+| Flash use (`.bin` size) | `via` build 74,328 B · `composer` build 83,192 B. About 39 KB of flash stays unused | `dist/` from `scripts/build-firmware.ps1` |
 | RAM | Fixed stacks: 1 KB main + 2 KB process. Free heap (unused headroom): `via` 2,616 B, `composer` 1,496 B. The scene takes 915 B and the engine state about 190 B | `scripts/mem_report.sh` |
-| EEPROM (QMK's *legacy* emulated EEPROM: 4 KB kept in 8 KB of flash, plus a 4 KB copy in RAM) | VIA custom block = NuPhy's 23-byte config + the **915-byte scene**. VIA's macro space shrinks from 2,400 B (ryodeushii's build, computed) to 1,485 B (computed, and confirmed on the keyboard 2026-09-25); NuPhy's stock 2.1.5 reported 2,411 B with a different layout. Details in [RESEARCH_PRESETS_AND_SLOTS.md](RESEARCH_PRESETS_AND_SLOTS.md#2-route-b-several-scenes-on-the-keyboard) | `firmware/keymap/config.h` |
+| EEPROM (settings storage) | 4,096 B, emulated in flash. The scene takes 915 B of it, which shrinks VIA's macro space from 2,400 B to 1,485 B. See [Storage](#storage-where-the-scene-lives-and-why-theres-only-one) | `firmware/keymap/config.h` |
 
 ## Architecture
 
@@ -40,35 +42,62 @@ flowchart LR
   NS -. "stock effects only" .-> DRV
 ```
 
+*WebHID* is the browser feature (Chrome and Edge on desktop) that lets a web page talk to a USB device after the user picks it in a pop-up.
+
 ### Per-frame pipeline for each LED (`hc_render_led`, integer math only)
 
 1. **Zone lookup.** `zone_of[led] & 7` picks one of 8 zones. Bit 7 means "ignore keypress overlays".
 2. **Base color from the zone's source:** painted per-LED RGB, the zone color, a 1–6 stop gradient sampled along an axis (optionally scrolling), or a rainbow.
 3. **The effect modulates that color.** Most effects only change brightness between the zone's `v_min` and `v_max`, so painted palettes survive every effect. Hue effects rotate each LED's *own* hue. Sparkle, Raindrops, Ripple and Heatmap blend toward an accent color.
 4. **Keypress overlay** (per zone): flash, glow, ripple, or halo echo.
-5. **Master brightness.** Keys use QMK's global value (Fn+↑/↓). The halo uses NuPhy's halo level (Fn+M+↑/↓, 6 steps), or optionally follows the keys. Optional gamma 2.2 (Studio: *Match screen colors*), which the factory look uses.
+5. **Master brightness.** Keys use QMK's global value (Fn+↑/↓). The halo uses NuPhy's halo level (Fn+M+↑/↓, 6 steps), or optionally follows the keys. Optional gamma 2.2, a brightness curve that makes LED values look the way they do on a screen (Studio: *Match screen colors*), which the default look uses.
 6. **Indicators** (battery, caps, OS, wireless) are drawn on top from the RGB-matrix indicator callback, so they never flicker against the effect. They're suppressed while the calibration wizard lights single LEDs.
 
 **Design rules:**
 
 - *Effects as modulators* are what make "standard effects while keeping my per-LED colors" possible.
 - *Zones* give per-key effects with different speeds without a RAM-heavy layer stack.
-- Every animation is a **pure function of (scene, time, key hits)**. Random effects hash per-LED time slots instead of storing state. That's what makes the browser preview bit-exact and keeps RAM tiny. The only stored state is 8 recent key hits and a 128-byte heat map.
+- Every animation is a **pure function of (scene, time, key hits)**. Random effects hash per-LED time slots instead of storing state. That's what makes the browser preview bit-exact and keeps RAM use small. The only stored state is the 8 most recent key hits and a 128-byte heat map.
 
 ### Integration points in ryodeushii's code (everything else untouched)
 
+In this table, `common/…` means `keyboards/nuphy/common/…` and `side.c` means `keyboards/nuphy/halo75v2/ansi/side.c`.
+
 | Where | Change |
 |---|---|
-| `keyboards/nuphy/halo75v2/ansi/keymaps/composer/` (from `firmware/keymap/`) | New keymap: a copy of `default`'s layers plus `HC_TOGGLE` on Fn+Enter (jump to Composer and back; its keycode is the one after ryodeushii's last custom keycode, checked by `make_via_json.py`), a 128-LED `g_led_config` in QMK's 224×64 coordinate space, and the three RGB-matrix user effects (`game_mode`, `position_mode`, `composer`). Halo LEDs carry flag `NONE`, so stock effects keep leaving them to NuPhy's halo engine. |
+| `keyboards/nuphy/halo75v2/ansi/keymaps/composer/` (copied from `firmware/keymap/`) | New keymap: a copy of `default`'s layers plus `HC_TOGGLE` on Fn+Enter (jump to Composer and back; its keycode is the one after ryodeushii's last custom keycode, checked by `tools/make_via_json.py`), a 128-LED `g_led_config` in QMK's 224×64 coordinate space, and the three RGB-matrix user effects (`game_mode`, `position_mode`, `composer`). Halo LEDs carry flag `NONE`, so stock effects keep leaving them to NuPhy's halo engine. |
 | `side.c` (+26 lines, under `#ifdef HALO_COMPOSER_ENABLE`) | `side_led_show()` returns early while Composer is active, *after* NuPhy's power-on sweep has had its turn. Adds `side_composer_overlay()` (battery + indicators) and `side_power_show_active()`. |
-| `common/config/config.h`, `common/core/keyboard.c`, `side.c` | The Caps Lock indicator colour becomes `CAPS_INDICATOR_RGB` (default: ryodeushii's teal). The Composer keymap sets magenta and `DEFAULT_CAPS_INDICATOR_TYPE` = both (status bar and Caps key). |
-| `common/config/config.c` (+7 lines) | Weak `nuphy_leds_need_power()` (default `false`, so no change for other keymaps). Composer returns true while the halo is lit, so turning key brightness to 0 no longer cuts power to both LED drivers. |
+| `common/config/config.h`, `common/core/keyboard.c`, `side.c` | The Caps Lock indicator color becomes `CAPS_INDICATOR_RGB` (default: ryodeushii's teal). The Composer keymap sets magenta and `DEFAULT_CAPS_INDICATOR_TYPE` = both (status bar and Caps key). |
+| `common/config/config.c` (+6 lines, 1 changed) | Weak `nuphy_leds_need_power()` (default `false`, so no change for other keymaps). Composer returns true while the halo is lit, so turning key brightness to 0 no longer cuts power to both LED drivers. |
 
-### EEPROM layout guard (added 2026-09-24)
+All of these patches are in `firmware/patches/nuphy-shared.diff`; the keymap is in `firmware/keymap/`.
 
-VIA stores, in order: magic bytes, layout options, the custom-config block, dynamic keymaps, macros. Composer grows the custom-config block by 915 bytes, so **VIA's keymaps move**. VIA decides whether its storage is valid by comparing the *build date* only. Switching between a non-Composer build and Composer built the same day, without the Esc-hold wipe, would therefore read stale bytes as keycodes.
+### EEPROM layout guard
 
-`hc_load(at_boot)` closes that gap: if the saved scene is invalid at boot, it calls `eeconfig_init_via()` (keymaps reset to `keymap.c` and macros cleared) and writes the default scene. `RELOAD` over USB never does this. Tests: `tests/protocol_test.py` ("first boot", "reboot with a valid scene", "reboot after other firmware", "RELOAD never resets").
+VIA stores, in order: magic bytes, layout options, the custom-config block, dynamic keymaps, macros. Composer grows the custom-config block by 915 bytes, so **VIA's keymaps move**. VIA decides whether its storage is valid by comparing the *build date* only. Switching between a non-Composer build and Composer built the same day, without the Esc-hold wipe (for example with the hardware recovery button), would therefore read stale bytes as keycodes.
+
+`hc_load(at_boot)` in `hc_qmk.c` closes that gap: if the saved scene is invalid at boot, it calls `eeconfig_init_via()` (keymaps reset to `keymap.c` and macros cleared) and writes the default scene. `RELOAD` over USB never does this. Tests: `tests/protocol_test.py` ("first boot", "reboot with a valid saved scene", "reboot after other firmware", "RELOAD ... never touches VIA keymaps").
+
+## Storage: where the scene lives and why there's only one
+
+- **Flash** is the chip's 128 KB of permanent memory. It holds the program and is erased in 2 KB blocks (pages).
+- **EEPROM** is settings storage. This chip has none, so QMK *emulates* it: 4,096 bytes of EEPROM kept in 8 KB of flash (half data, half a write log), plus a 4 KB copy in RAM. This board uses QMK's *legacy* emulated-flash driver, not the newer wear-leveling one.
+
+The saved scene sits inside VIA's custom-config block, right after NuPhy's 23-byte settings (`firmware/keymap/config.h`: `VIA_EEPROM_CUSTOM_CONFIG_SIZE` = 23 + 915). VIA's macros get whatever is left at the end:
+
+| Bytes | Contents | Size (B) |
+|---|---|---|
+| 0–36 | QMK core settings | 37 |
+| 37–40 | VIA magic + layout options | 4 |
+| 41–63 | NuPhy keyboard settings (`keyboard_config`) | 23 |
+| 64–978 | **Composer scene** | 915 |
+| 979–2610 | VIA keymaps: 8 layers × 6 rows × 17 columns × 2 B | 1,632 |
+| 2611–4095 | **VIA macros** (everything left) | **1,485** |
+
+- Without Composer, ryodeushii's `via` build has **2,400 B** of macro space (computed). With Composer it's **1,485 B** (computed, and confirmed by reading it back from a keyboard). NuPhy's stock 2.1.5 reports 2,411 B, with a different layout.
+- QMK refuses to build if fewer than 100 B would be left for macros.
+- **Why only one scene:** a second full scene fits, leaving 570 B for macros; a third doesn't fit with 8 layers. Growing the emulated EEPROM costs the same amount of RAM (because of the RAM copy), and only 1,496 B of RAM is free. The better route is a separate scene store in unused flash, which would hold 8 scenes and give the macro space back: see [several stored scenes](ROADMAP_AND_HISTORY.md#several-stored-scenes-on-the-keyboard) on the roadmap.
+- Entering flashing mode with Esc held wipes this whole EEPROM, scene included. After that, `hc_load` writes the default scene.
 
 ## Scene format (`hc_scene_t`, 915 bytes, packed, little-endian)
 
@@ -99,11 +128,15 @@ Zone (20 bytes):
 | 9 | source | 0 painted, 1 zone color, 2 gradient, 3 rainbow |
 | 10, 11 | src_axis, src_scale | axis and scale (16 = once across) for gradient/rainbow |
 | 12 | gradient | slot 0–3 |
-| 13 | reactive | low nibble: 0 none, 1 flash, 2 glow, 3 ripple, 4 halo echo · high nibble: fade 0–15 |
+| 13 | reactive | low nibble: 0 none, 1 flash, 2 glow, 3 ripple, 4 halo echo · high nibble: fade 0–15 (overlay lasts `200 + (15 − fade) × 120` ms) |
 | 14–16 | color | zone color (source 1), or accent color (black = the LED's own color) |
 | 17–19 | rx_color | overlay color (black = white) |
 
-**Default scene** (factory and "Warm Desk"): keys (255, 200, 140) static; WASD (255, 170, 70) at 78%; halo amber (255, 100, 16) breathing 50–100% with a ~4.7 s cycle.
+**Default scene** (the factory look, and Studio's starter scene *Warm Desk*), from `hc_scene_defaults()` in `hc_engine.c`:
+
+- Every LED painted 2700K (255, 167, 87); gamma 2.2 on.
+- Keys (zone index 0): Ripple resting at full brightness, with mint (#70FF94) rings that fade out after about two keys (`p2` = 24 units, 12 per key), plus a mint Flash overlay lasting 560 ms.
+- Halo, all 45 LEDs (zone index 2): Breathe on the 2700K zone color between 30% and 100% (`v_min` 77, `v_max` 255) at speed 40, about 4.7 s per breath.
 
 Changing this layout means bumping `HC_SCENE_VERSION`, updating `SCENE_BYTES` in `studio/hc_engine.js` and the offsets in `tools/halo_protocol.py`. The `_Static_assert` in `hc_qmk.c` catches size changes.
 
@@ -112,7 +145,7 @@ Changing this layout means bumping `HC_SCENE_VERSION`, updating `SCENE_BYTES` in
 | # | Effect | p1 | p2 |
 |---|---|---|---|
 | 0 | Static | – | – |
-| 1 | Breathe (sine between Min and Max; with spread, a travelling wave) | – | – |
+| 1 | Breathe (sine between Min and Max; with spread, a traveling wave) | – | – |
 | 2 | Heartbeat | – | – |
 | 3 | Wave (bright band) | band width | – |
 | 4 | White wave | band width | whiteness |
@@ -129,7 +162,9 @@ Changing this layout means bumping `HC_SCENE_VERSION`, updating `SCENE_BYTES` in
 | 15 | Heatmap (cools over ~10 s) | – | – |
 | 16 | Off | – | – |
 
-Together these cover QMK's standard effect families as modulators: breathing and band → Breathe, White wave, Wave; cycles, pinwheel and spiral → Color cycle and Flow with an axis; hue effects → Hue drift; raindrops → Raindrops and Sparkle; reactive → Reactive fade and overlays; splash → Ripple; typing heatmap → Heatmap. The stock QMK effects are all still there; Composer is one more mode.
+Together these cover QMK's standard effect families as modulators: breathing and band → Breathe, White wave, Wave; cycles, pinwheel and spiral → Color cycle and Flow with an axis; hue effects → Hue drift; raindrops → Raindrops and Sparkle; reactive → Reactive fade and overlays; splash → Ripple; typing heatmap → Heatmap.
+
+The keyboard's **42 stock RGB effects** are all still there. Composer is one more, so the Fn+← list has **43** entries, with Composer last. VIA's Effect dropdown shows the same 43 after its "All Off" entry (which Fn+← never reaches). A static assert in `firmware/keymap/keymap.c` keeps Composer at mode 43.
 
 ## USB protocol (command byte `0xD0`)
 
@@ -152,15 +187,15 @@ Request `[0xD0, sub, args…]` → response `[0xD0, sub, status, payload…]`. S
 | 0x14 | SIM_KEY | led: inject a key hit (preview reactions on the hardware) |
 | 0x15 | GET_STATS | → frames (u32 LE), key master, halo master, halo level, power-on sweep active |
 
-A full scene push is about 45 packets. Studio sends only what changed, 60 ms after the last edit, one request at a time.
+A full scene push is about 40 packets. Studio sends only what changed, 60 ms after the last edit, one request at a time.
 
 ## Halo Studio internals
 
-- **One HTML file**, assembled by `studio/build_studio.py` from `studio.tpl.html`, `geometry.json`, `hc_engine.js` (the JS twin of `hc_engine.c`) and `studio_a…e.js` (one shared scope). No build tools and no dependencies besides Google Fonts.
+- **One HTML file**, assembled by `studio/build_studio.py` from `studio.tpl.html`, `geometry.json`, `hc_engine.js` (the JS twin of `hc_engine.c`) and `studio_a…e.js` (one shared scope). No build tools and no dependencies. The only external request is a Google Fonts stylesheet; without it the page uses fallback system fonts. The same script also writes `halo-studio-preview.html`, a variant for pages that embed Studio in a frame that blocks USB; it can't connect to a keyboard.
 - **Sync:** edits mark LEDs, zones, gradients, geometry and flags as dirty. A serialized `flush()` sends dirty ranges, always reading the *current* scene, and re-marks everything on failure. Save waits for any in-flight sync first. Reads (connect, read, revert, factory) settle the sync before replacing the scene.
 - **Halo geometry is treated as a property of the keyboard**, not of a look. Loading starter scenes, library entries or imports keeps it.
-- **Storage:** autosave plus "My scenes" in `localStorage`, which is per browser and per web address. Export/import uses `.halo.json` (`{"format": "halo-studio-scene", "version": 1, "scene": <base64 of the 915 bytes>}`); `halo_kb.py scene-backup`/`scene-restore` use the same format.
+- **Storage:** autosave plus "My scenes" in the browser's `localStorage`, which is per browser and per web address (so a copy of Studio at another address has its own library). Studio also keeps the 5 newest automatic backups it makes when connecting or reading the keyboard. Export/import uses `.halo.json` files: `{"format": "halo-studio-scene", "version": 1, "name", "created", "zoneNames", "scene": <base64 of the 915 bytes>}`. `tools/halo_kb.py scene-backup`/`scene-restore` use the same format.
 
 ## Parity: why the preview matches the keyboard
 
-`hc_engine.c` and `studio/hc_engine.js` are written line by line to produce identical integers. That covers FastLED-style `sin8`, integer HSV, an octant `atan2`, integer square root, and C-style truncating division in JS. `tests/host_vectors.c` renders 80 fuzzed scenes (all effects, sources, axes, overlays, flags, 0–6 stop gradients, off-grid halo positions, timer wrap) and `tests/parity_test.mjs` replays them in JS, requiring **byte-identical** frames. **Any change to the engine math must be made in both files.**
+`hc_engine.c` and `studio/hc_engine.js` are written line by line to produce identical integers. That covers FastLED-style `sin8`, integer HSV, an octant `atan2`, integer square root, and C-style truncating division in JS. `tests/host_vectors.c` renders 80 fuzzed scenes × 40 frames (all effects, sources, axes, overlays, flags, 0–6 stop gradients, off-grid halo positions, timer wrap) and `tests/parity_test.mjs` replays them in JS, requiring **byte-identical** frames. **Any change to the engine math must be made in both files.**

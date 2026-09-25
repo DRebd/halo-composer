@@ -6,7 +6,7 @@
 // on a PC for unit tests and mirrored 1:1 by the JavaScript preview engine
 // (halo-studio.html -> class HcEngine). Every integer operation here has an
 // exact JS twin; if you change the math here, change it there too and rerun
-// the parity test (tools/parity_test.sh).
+// the parity test (tests/parity_test.mjs, run by tests/run_tests.sh).
 
 #pragma once
 

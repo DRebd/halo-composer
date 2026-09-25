@@ -5,7 +5,7 @@ Inlines geometry.json, hc_engine.js and studio_a..e.js into studio.tpl.html.
 
 Usage: build_studio.py [--out DIR]     (default: <repo>/dist)
 Writes DIR/halo-studio.html, plus DIR/halo-studio-preview.html, a variant for
-hosts that block WebHID (e.g. a claude.ai artifact). The preview can't connect.
+hosts that block WebHID (e.g. sandboxed iframes). The preview can't connect.
 """
 import argparse
 import pathlib

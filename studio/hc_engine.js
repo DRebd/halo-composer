@@ -1,6 +1,6 @@
 // Halo Composer - JavaScript twin of hc_engine.c (bit-exact).
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Used by Halo Studio for the live preview and by tools/parity_test.mjs.
+// Used by Halo Studio for the live preview and by tests/parity_test.mjs.
 // Every integer operation mirrors the C code; keep both files in sync.
 (function (root) {
   'use strict';

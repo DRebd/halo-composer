@@ -138,7 +138,7 @@ function tabZones(body) {
       (z.reactive & 15) ? el('div', { class: 'desc' }, RX_META[z.reactive & 15][1]) : null,
       (z.reactive & 15) ? slider('Fade', z.reactive >> 4, 0, 15, (v) => upd((q) => { q.reactive = (q.reactive & 0x0F) | (v << 4); }), (v) => `${((200 + (15 - v) * 120) / 1000).toFixed(2)} s`) : null,
       (z.reactive & 15) ? field('Reaction color', colorInput(z.rxColor, (c) => upd((q) => { q.rxColor = c; })), 'black = white') : null,
-      el('p', { class: 'hint' }, 'Tip: switch the stage tool to "Type" and click keys to try reactions.')),
+      el('p', { class: 'hint' }, 'Tip: set Tool to "Type (test reactive)" and click keys to try reactions.')),
   );
 }
 
