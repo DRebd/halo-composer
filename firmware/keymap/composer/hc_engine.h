@@ -90,10 +90,19 @@ typedef enum {
     HC_RX_COUNT
 } hc_reactive_t;
 
-// zone.flags
+// zone.flags (unknown bits are stored and ignored, so older firmware just skips newer features)
 #define HC_ZF_REVERSE 0x01    // run the effect the other way along its axis
 #define HC_ZF_SRC_SCROLL 0x02 // also scroll the colour source (any effect)
-#define HC_ZF_MIRROR 0x04     // mirror the axis around its middle (ping-pong shapes)
+#define HC_ZF_MIRROR 0x04     // fold the axis at its middle (spatial: shapes symmetric about the centre)
+#define HC_ZF_PINGPONG 0x08   // "back and forth" (temporal): motion runs forward for one cycle, then
+                              // back for one cycle, instead of jumping back to the start. Applies to
+                              // Wave, White wave, Color cycle, Flow, Comet, Breathe with spread > 0,
+                              // and to the colour-source scroll (HC_ZF_SRC_SCROLL) of any effect.
+
+// gradient.flags
+#define HC_GF_WRAP 0x01   // the last stop blends back into the first
+#define HC_GF_MIRROR 0x02 // sampled as a palindrome: stops A,B,C play A->B->C->B->A across 0..255
+                          // (with HC_GF_WRAP too, the wrapped loop plays forward then backward)
 
 // scene.flags
 #define HC_SF_GAMMA 0x01          // perceptual gamma 2.2 on output
@@ -130,7 +139,7 @@ typedef struct HC_PACKED {
 
 typedef struct HC_PACKED {
     uint8_t   count; // 1..HC_GRAD_STOPS
-    uint8_t   flags; // bit0 = wrap (last stop blends back into first)
+    uint8_t   flags; // HC_GF_* (bit0 wrap, bit1 mirror)
     hc_stop_t stop[HC_GRAD_STOPS];
 } hc_gradient_t; // 26 bytes
 

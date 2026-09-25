@@ -25,16 +25,18 @@ A community maintainer's rework of NuPhy's own QMK source. It keeps the same key
 - **Up to date.** Synced with upstream QMK 0.32.7, whereas NuPhy's source updates rarely and trails its releases. It also offers optional support for SignalRGB, a desktop lighting-control app (a separate `srgb` build).
 - **Caveat:** the July 2026 code Halo Composer builds on hasn't been packaged as a release. His last release is ryo-1.1.4 from September 2024.
 
-**What it still can't do:** give individual keys their own color, treat the halo as individual LEDs (it still has NuPhy's 4 halo modes plus Off), or breathe without fading fully to off.
+**What it still can't do:** let you design the lighting yourself, LED by LED. The keys run one stock effect at a time, all sharing one color setting, and the halo is still a single strip with NuPhy's 4 halo modes plus Off. There's no way to give individual LEDs their own colors, run different effects on different parts of the board, or layer keypress reactions over an effect.
 
 ## 2. What Halo Composer and Halo Studio add on top of ryodeushii's
 
-**Halo Composer** is the new lighting engine *inside the keyboard's firmware*; **Halo Studio** is the web page on the PC used to design the lighting and send it to Composer over the USB cable.
+**Halo Composer** is a new lighting engine *inside the keyboard's firmware*; **Halo Studio** is the web page on the PC used to design the lighting and send it to Composer over the USB cable.
 
-- **Every LED is individually colorable:** the 83 key LEDs and the 42 halo, status-bar and badge LEDs (the halo has 45 positions, but 3 have no LED fitted). The halo LEDs become ordinary LEDs instead of a fixed-mode light strip.
+Together they make the lighting fully custom. A Composer **scene** combines, all at the same time: a color for every LED, up to 8 zones that each run their own effect, speed and brightness range over those colors (or over a gradient or rainbow), and keypress reactions on top. You design it live in the browser; the keyboard then runs it on its own, in every connection mode.
+
+- **Every LED is individually colorable:** the 83 key LEDs and the 42 halo and status-bar LEDs (the halo has 45 positions, but 3 have no LED fitted). The halo LEDs become ordinary LEDs instead of a fixed-mode light strip.
 - **Effects keep the painted colors.** 17 effects, including Off (breathe, heartbeat, wave, candle, comet, ripple, sparkle, heatmap, ...), animate the colors painted on each LED instead of replacing them with one color.
-- **Up to 8 zones**, each with its own effect, speed and **brightness floor and ceiling**. "WASD breathes fast while the halo breathes slowly between 50% and 100%" is simply two zones.
-- **Gradients and reactions.** Four gradients of up to 6 colors each, plus rainbow sources. Keypress reactions (flash, glow, ripple, or *halo echo*, which lights the halo next to the pressed key) can go on any zone.
+- **Up to 8 zones**, each with its own effect, speed and **brightness floor and ceiling**. For example: a gradient gliding across the letters, WASD pulsing fast in another color, and the halo breathing slowly between 50% and 100%, with every key flashing when pressed, is three zones plus a Flash reaction.
+- **Gradients, motion and reactions.** Four gradients of up to 6 colors each, plus rainbow sources; a gradient can loop back through its colors or blend its last color into the first. Moving effects can run *back and forth* instead of restarting. Keypress reactions (flash, glow, ripple, or *halo echo*, which lights the halo on the pressed key's side of the board) can go on any zone.
 - **Default look:** 2700K warm-white keys; a pressed key flashes mint (#70FF94) for about half a second and sends a mint ripple about two keys outward; a 2700K halo breathing between 30% and 100%. It shows right after flashing.
 - **Keeps what works.** Fn+↑/↓ still sets key brightness and Fn+M+↑/↓ still sets halo brightness. The battery, Caps Lock and wireless indicators draw on top; Caps Lock is magenta on both the key and the status bar. NuPhy's boot animation still plays. VIA still remaps keys, and every ryodeushii feature above is untouched. The 42 stock effects are one Fn+← away, and **Fn+Enter** jumps between Composer and the last stock effect.
 - **Fixes a stock quirk:** turning key brightness to 0 no longer switches the halo off too.
@@ -43,12 +45,13 @@ A community maintainer's rework of NuPhy's own QMK source. It keeps the same key
   - paint, select and eyedropper tools, with one-click selections (WASD, arrows, halo sides, ...);
   - an effects gallery with animated previews, 11 starter scenes, and a scene library with export and import;
   - a **halo calibration wizard** that maps where each halo LED really sits;
-  - live push while editing, and Save to keep the result on the keyboard.
+  - live push while editing, and Save to keep the result on the keyboard;
+  - hover help that explains the labels and buttons.
 - **Built to be safe to change.**
   - A boot-time guard stops leftover data being read as keys after switching firmware.
   - Studio recognizes keyboards without Composer instead of just timing out.
   - A command-line tool does backups, self-tests and scene backup/restore.
   - Automated tests (firmware-vs-preview parity, protocol, browser end to end) run on GitHub for every update to the main branch and every pull request (proposed change).
-- **Costs:** VIA macro space drops from 2,400 to 1,485 bytes, and free RAM (the keyboard's working memory) drops from about 2.6 KB to 1.5 KB. Editing works over USB only; saved lighting runs in every mode. The keyboard stores one scene at a time. More in [Known limitations](ROADMAP_AND_HISTORY.md#known-limitations-and-open-questions).
+- **Costs:** VIA macro space drops from 2,400 to 1,485 bytes, and free RAM (the keyboard's working memory) drops from about 2.6 KB to 1.5 KB. Editing works over USB only; saved lighting runs in every mode. The keyboard stores one scene at a time. Studio still takes some trial and error, and simplifying it is the top [roadmap](ROADMAP_AND_HISTORY.md#simplify-studio) item. More in [Known limitations](ROADMAP_AND_HISTORY.md#known-limitations-and-open-questions).
 
 How it all works: [HOW_IT_WORKS.md](HOW_IT_WORKS.md). How to use it: [USER_GUIDE.md](USER_GUIDE.md).

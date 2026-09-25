@@ -194,6 +194,7 @@ static void hc_handle_hid(uint8_t *data) {
             hc_zone_t z;
             if (a[0] >= HC_ZONES) { *status = HC_E_ARG; break; }
             memcpy(&z, &a[1], sizeof(z));
+            // z.flags is stored as sent, unknown bits included (HC_ZF_*; see hc_scene_valid)
             if (z.effect >= HC_FX_COUNT || z.source >= HC_SRC_COUNT || z.axis >= HC_AXIS_COUNT || z.src_axis >= HC_AXIS_COUNT || z.gradient >= HC_GRADIENTS) {
                 *status = HC_E_ARG;
                 break;
@@ -210,6 +211,7 @@ static void hc_handle_hid(uint8_t *data) {
             hc_gradient_t g;
             if (a[0] >= HC_GRADIENTS) { *status = HC_E_ARG; break; }
             memcpy(&g, &a[1], sizeof(g));
+            // g.flags is stored as sent, unknown bits included (HC_GF_*)
             if (g.count > HC_GRAD_STOPS) { *status = HC_E_ARG; break; }
             hc_scene.grad[a[0]] = g;
             break;

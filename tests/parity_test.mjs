@@ -23,12 +23,40 @@ V.rgb2hsv.forEach((e, i) => { const b = hexToBytes(e); const hsv = U.rgb2hsv([b[
   check('atan2', toHex(Uint8Array.from(out)) === V.atan2); }
 { let k = 0; for (let n = 0; n < 70000; n += 97, k++) check('isqrt' + n, U.isqrt32(n) === V.isqrt[k], `${U.isqrt32(n)} vs ${V.isqrt[k]}`); }
 
+// flag values shared with Studio (and hc_engine.h)
+check('ZF.PINGPONG', HC.ZF && HC.ZF.PINGPONG === 8, JSON.stringify(HC.ZF));
+check('GF', HC.GF && HC.GF.WRAP === 1 && HC.GF.MIRROR === 2, JSON.stringify(HC.GF));
+// a mirrored gradient is a palindrome in the JS twin too (Studio's gradient bars use gradSample)
+{ let seed = 7; const r = () => { seed = U.hash32(seed + 0x9E3779B9); return seed; };
+  for (let n = 0; n < 200; n++) {
+    const g = HC.blankGradient(); g.count = r() % 7; g.flags = HC.GF.MIRROR | (n & 1 ? HC.GF.WRAP : 0);
+    let pos = r() % 60;
+    for (const st of g.stops) { st.pos = pos; st.r = r() & 255; st.g = r() & 255; st.b = r() & 255; pos = Math.min(255, pos + (r() % 60)); }
+    for (let p = 0; p < 256; p++) { const a = U.gradSample(g, p, [0, 0, 0]).join(), b = U.gradSample(g, 255 - p, [0, 0, 0]).join(); check(`mirror palindrome #${n} p=${p}`, a === b, `${a} vs ${b}`); }
+  } }
+
 const keyXY = new Uint8Array(83 * 2); geom.keys.forEach((k) => { keyXY[k.led * 2] = k.px; keyXY[k.led * 2 + 1] = k.py; });
+// coverage of the newer flags among the zones/gradients that the vectors actually render
+const cover = { ppByFx: {}, ppScroll: 0, ppRev: 0, ppMirror: 0, gMirror: 0, gMirrorWrap: 0 };
 let frames = 0;
 V.tests.forEach((T, ti) => {
   const bytes = hexToBytes(T.scene);
   const scene = HC.sceneFromBytes(bytes);
   check('roundtrip#' + ti, toHex(HC.sceneToBytes(scene)) === T.scene);
+  const used = new Set(Array.from(scene.zoneOf, (v) => v & 7));
+  for (const zi of used) {
+    const z = scene.zones[zi];
+    if (z.flags & HC.ZF.PINGPONG) {
+      cover.ppByFx[z.effect] = (cover.ppByFx[z.effect] || 0) + 1;
+      if (z.flags & HC.ZF.SRC_SCROLL) cover.ppScroll++;
+      if (z.flags & HC.ZF.REVERSE) cover.ppRev++;
+      if (z.flags & HC.ZF.MIRROR) cover.ppMirror++;
+    }
+    if (z.source === HC.SRC.GRADIENT) {
+      const g = scene.grad[z.gradient % 4];
+      if (g.flags & HC.GF.MIRROR) { if (g.flags & HC.GF.WRAP) cover.gMirrorWrap++; else cover.gMirror++; }
+    }
+  }
   const eng = new HC.HcEngine(keyXY);
   const buf = new Uint8Array(128 * 3);
   for (const op of T.ops) {
@@ -45,5 +73,8 @@ V.tests.forEach((T, ti) => {
     }
   }
 });
+const fxName = Object.fromEntries(Object.entries(HC.FX).map(([k, v]) => [v, k]));
+console.log('coverage (rendered zones with back and forth, by effect): ' + Object.entries(cover.ppByFx).map(([k, v]) => `${fxName[k]} ${v}`).join(', ') +
+  ` | with SRC_SCROLL ${cover.ppScroll}, REVERSE ${cover.ppRev}, MIRROR ${cover.ppMirror} | gradient zones mirrored ${cover.gMirror}, mirrored+wrap ${cover.gMirrorWrap}`);
 console.log(fails ? `PARITY FAILED: ${fails} mismatches` : `PARITY OK: ${V.tests.length} scenes, ${frames} frames x 128 LEDs, unit vectors all match`);
 process.exit(fails ? 1 : 0);

@@ -48,6 +48,15 @@ function ledColor(led) {
   return disp([frame[led * 3], frame[led * 3 + 1], frame[led * 3 + 2]]);
 }
 let marquee = null;
+// Every halo LED is drawn the same size except the 5 small status-bar LEDs.
+const haloSmall = (i) => GEOM.halo[i].group === 'status';
+const haloR = (i) => U * (haloSmall(i) ? 0.09 : 0.13);
+// Canvas shadows ignore the transform, so their sizes are given in device pixels.
+function setShadow(color, blur, offset = 0) {
+  const dpr = window.devicePixelRatio || 1;
+  ctx.shadowColor = color; ctx.shadowBlur = blur * dpr; ctx.shadowOffsetX = ctx.shadowOffsetY = offset * dpr;
+}
+const clearShadow = () => { ctx.shadowColor = 'rgba(0,0,0,0)'; ctx.shadowBlur = 0; ctx.shadowOffsetX = ctx.shadowOffsetY = 0; };
 function draw() {
   const W = cv.clientWidth, H = parseFloat(cv.style.height);
   ctx.clearRect(0, 0, W, H);
@@ -60,16 +69,14 @@ function draw() {
   for (let i = 0; i < HALO_LEDS; i++) {
     if (ABSENT.has(KEY_LEDS + i)) continue;
     const led = KEY_LEDS + i, [x, y] = haloPos(i), c = ledColor(led), lum = Math.max(c[0], c[1], c[2]);
-    const grp = GEOM.halo[i].group, small = grp === 'status' || grp === 'badge';
+    const small = haloSmall(i);
     if (lum > 4) { const rg = ctx.createRadialGradient(x, y, 0, x, y, U * (small ? 0.35 : 0.55)); rg.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},${0.55 * lum / 255})`); rg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = rg; ctx.fillRect(x - U, y - U, 2 * U, 2 * U); }
-    ctx.beginPath(); ctx.arc(x, y, U * (small ? 0.09 : 0.13), 0, Math.PI * 2);
+    ctx.beginPath(); ctx.arc(x, y, haloR(i), 0, Math.PI * 2);
     ctx.fillStyle = lum > 4 ? `rgb(${c[0]},${c[1]},${c[2]})` : '#2a2d34'; ctx.fill();
     if (state.sel.has(led)) { ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke(); }
-    if (state.view === 'zones') drawZoneTag(led, x + U * 0.16, y - U * 0.16, 0.24);
     if (state.tab === 'halo' && state.calib.idx === i) { ctx.beginPath(); ctx.arc(x, y, U * 0.26, 0, Math.PI * 2); ctx.strokeStyle = '#ffab3d'; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]); }
   }
   // keys
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const k of KEYS) {
     const [x, y, w, h] = keyRect(k), c = ledColor(k.led), lum = Math.max(c[0], c[1], c[2]);
     roundRect(x, y, w, h, U * 0.12); ctx.fillStyle = '#17191e'; ctx.fill();
@@ -79,19 +86,38 @@ function draw() {
       roundRect(x, y, w, h, U * 0.12); ctx.fillStyle = gr; ctx.fill();
     }
     roundRect(x + 0.5, y + 0.5, w - 1, h - 1, U * 0.12); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.stroke();
-    const light = (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) > 150;
-    ctx.fillStyle = light ? 'rgba(20,18,14,.85)' : 'rgba(235,231,223,.78)';
-    ctx.font = `500 ${Math.max(9, U * (k.label.length > 3 ? 0.2 : 0.26))}px "IBM Plex Sans", system-ui, sans-serif`;
-    ctx.fillText(k.label, x + w / 2, y + h / 2);
     if (state.sel.has(k.led)) { roundRect(x - 1, y - 1, w + 2, h + 2, U * 0.14); ctx.lineWidth = 2.2; ctx.strokeStyle = '#fff'; ctx.stroke(); }
-    if (state.view === 'zones') drawZoneTag(k.led, x + w - U * 0.16, y + U * 0.16, 0.24);
   }
+  // Key labels: one fixed near-black colour on a soft white glow. Switching the colour with
+  // the key's brightness made labels flicker while effects animated. Each label is drawn
+  // twice so the blurred glow builds up enough to read on unlit keys.
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#111';
+  setShadow('rgba(255,255,255,.95)', U * 0.12);
+  for (const k of KEYS) {
+    const [x, y, w, h] = keyRect(k);
+    ctx.font = `500 ${Math.max(9, U * (k.label.length > 3 ? 0.2 : 0.26))}px "IBM Plex Sans", system-ui, sans-serif`;
+    ctx.fillText(k.label, x + w / 2, y + h / 2); ctx.fillText(k.label, x + w / 2, y + h / 2);
+  }
+  clearShadow();
+  if (state.view === 'zones') drawZoneNumbers();
   if (marquee) { ctx.fillStyle = 'rgba(255,171,61,.12)'; ctx.strokeStyle = '#ffab3d'; ctx.lineWidth = 1; ctx.fillRect(marquee.x, marquee.y, marquee.w, marquee.h); ctx.strokeRect(marquee.x, marquee.y, marquee.w, marquee.h); }
 }
-function drawZoneTag(led, x, y, r) {
-  const z = state.scene.zoneOf[led] & 7;
-  ctx.beginPath(); ctx.arc(x, y, U * r * 0.55, 0, Math.PI * 2); ctx.fillStyle = ZONE_TINTS[z]; ctx.fill();
-  ctx.fillStyle = '#111'; ctx.font = `700 ${U * r * 0.7}px "IBM Plex Mono", monospace`; ctx.fillText(String(z + 1), x, y + 0.5);
+// Zones view: white numbers with a black drop shadow. On keys the number sits at the bottom
+// of the key (where its LED shines out); on the halo it sits inside the LED's dot.
+const NUM_FONT = '"Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif';
+function drawZoneNumbers() {
+  const zone = (led) => String((state.scene.zoneOf[led] & 7) + 1);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff';
+  setShadow('rgba(0,0,0,.95)', Math.max(1.5, U * 0.04), Math.max(1, U * 0.02));
+  ctx.font = `700 ${U * 0.24}px ${NUM_FONT}`;
+  for (const k of KEYS) { const [x, y, w, h] = keyRect(k); ctx.fillText(zone(k.led), x + w / 2, y + h - U * 0.15); }
+  for (let i = 0; i < HALO_LEDS; i++) {
+    if (ABSENT.has(KEY_LEDS + i)) continue;
+    const [x, y] = haloPos(i);
+    ctx.font = `700 ${U * (haloSmall(i) ? 0.16 : 0.22)}px ${NUM_FONT}`;
+    ctx.fillText(zone(KEY_LEDS + i), x, y + U * 0.01);
+  }
+  clearShadow();
 }
 
 // -------------------------------------------------------------- selection

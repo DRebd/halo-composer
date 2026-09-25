@@ -22,31 +22,35 @@ def key_xy(k):
 key_xy_list = [key_xy(k) for k in KEYS]
 
 # --- halo (indices 83..127). Positions MEASURED on a real Halo75 V2 with Halo
-# Studio's calibration wizard (2026-09-25; LED 36 corrected by hand). The group
-# names are the original inference from NuPhy's side.c and only label areas.
-front = [125,126,127,92,91,90,89,88] + list(range(93,104))       # right -> left
-left  = list(range(104,111))                                     # front -> back
-status= list(range(83,88))                                       # top-left surface bar
-back  = list(range(111,118))                                     # left -> right
-badge = [118,119]                                                # top-right
-right = list(range(120,125))                                     # back -> front
-groups = {}
-for name, leds in (('front', front), ('left', left), ('right', right), ('back', back), ('status', status), ('badge', badge)):
-    for led in leds: groups[led] = name
-assert sorted(groups) == list(range(83,128))
-
+# Studio's calibration wizard, then squared up by the owner (2026-09-25): every
+# halo LED sits on the board edge, left x=7, back y=9, right x=217, front y=62;
+# only the status bar and the short strip between Fn and Left are inside it.
 CALIBRATED = [  # halo LED 1..45 = index 83..127, engine coordinates (x 0..224, y 0..64)
     (16,5), (19,5), (22,5), (25,5), (28,5),                      # 1-5 status bar
-    (169,53), (169,56), (169,59),                                # 6-8 short vertical strip
+    (169,53), (169,56), (169,59),                                # 6-8 short vertical strip between Fn and Left
     None, None,                                                  # 9-10 not fitted
-    (164,61), (149,61), (136,61), (126,61), (112,61), (100,61), (87,61), (74,61), (61,61), (49,61), (35,61), (20,61),
-    (7,57), (7,48), (7,38), (7,27), (7,20),                      # 23-27 left side
-    (40,9), (57,9), (76,9), (96,9), (115,9), (134,9), (150,9), (175,9), (169,9),
-    (215,16), (215,26), (215,36), (215,44), (214,56),            # 37-41 right side
-    (196,62), (184,62), (174,62),
+    (164,62), (149,62), (136,62), (126,62), (112,62), (100,62),  # 11-22 front edge, right -> left
+    (87,62), (74,62), (61,62), (49,62), (35,62), (20,62),
+    (7,57), (7,48), (7,38), (7,27), (7,20),                      # 23-27 left edge, front -> back
+    (40,9), (57,9), (76,9), (96,9), (115,9), (134,9),            # 28-36 back edge, left -> right
+    (158,9), (178,9), (196,9),
+    (217,17), (217,26), (217,36), (217,44), (217,56),            # 37-41 right edge, back -> front
+    (196,62), (184,62), (174,62),                                # 42-44 front edge, right corner
     None,                                                        # 45 not fitted
 ]
 assert len(CALIBRATED) == 45
+
+# Areas for Studio's quick-selects, by halo LED number (1..45, inclusive ranges).
+# 9, 10 and 45 have no LED fitted; they are filed under 'front' only so that every
+# entry has a group (Studio leaves absent LEDs out of every selection anyway).
+GROUP_RANGES = (('status', 1, 5), ('strip', 6, 8), ('front', 9, 22), ('left', 23, 27),
+                ('back', 28, 36), ('right', 37, 41), ('front', 42, 45))
+groups = {}
+for name, first, last in GROUP_RANGES:
+    for n in range(first, last + 1):
+        assert 83 + n - 1 not in groups
+        groups[83 + n - 1] = name
+assert sorted(groups) == list(range(83,128))
 # Halo LEDs that light nothing on this board (NuPhy's driver has channels for
 # them but no LED is fitted). Studio hides and skips them; ring order ignores them.
 ABSENT = [i for i, p in enumerate(CALIBRATED) if p is None]      # 0-based: 8, 9, 44

@@ -16,7 +16,8 @@
   const SRC = { MAP: 0, ZONE: 1, GRADIENT: 2, RAINBOW: 3, COUNT: 4 };
   const AXIS = { X: 0, Y: 1, RADIAL: 2, ANGLE: 3, SPIRAL: 4, DIAG: 5, RING: 6, NONE: 7, COUNT: 8 };
   const RX = { NONE: 0, FLASH: 1, GLOW: 2, RIPPLE: 3, ECHO: 4, COUNT: 5 };
-  const ZF = { REVERSE: 1, SRC_SCROLL: 2, MIRROR: 4 };
+  const ZF = { REVERSE: 1, SRC_SCROLL: 2, MIRROR: 4, PINGPONG: 8 }; // PINGPONG = "back and forth"
+  const GF = { WRAP: 1, MIRROR: 2 }; // gradient.flags
   const SF = { GAMMA: 1, HALO_FOLLOWS_KEYS: 2 };
   const LF = { ZONE_MASK: 7, NO_REACT: 0x80 };
 
@@ -118,11 +119,13 @@
   const isBlack = (c) => (c[0] | c[1] | c[2]) === 0;
 
   function gradSample(g, pos, out) {
+    // GF.MIRROR: fold the position first (palindrome A B C D C B A); exactly as hc_grad_sample()
+    if (g.flags & GF.MIRROR) { const m = pos < 128 ? pos : 255 - pos; pos = (m * 515) >> 8; }
     let n = Math.min(g.count, GRAD_STOPS);
     if (n === 0) { out[0] = out[1] = out[2] = 0; return out; }
     const st = g.stops;
     if (n === 1) { out[0] = st[0].r; out[1] = st[0].g; out[2] = st[0].b; return out; }
-    const wrap = (g.flags & 1) !== 0;
+    const wrap = (g.flags & GF.WRAP) !== 0;
     let i = 0;
     while (i < n && st[i].pos <= pos) i++;
     let a, b, span, off;
@@ -138,6 +141,15 @@
     const f = span ? Math.floor((off * 255) / span) & 0xFF : 0;
     out[0] = lerp8(a.r, b.r, f); out[1] = lerp8(a.g, b.g, f); out[2] = lerp8(a.b, b.b, f);
     return out;
+  }
+
+  // effects whose time phase ZF.PINGPONG turns into a triangle (as pingpong_fx() in C)
+  function pingpongFx(z) {
+    switch (z.effect) {
+      case FX.WAVE: case FX.SATWAVE: case FX.COLOR_CYCLE: case FX.FLOW: case FX.COMET: return true;
+      case FX.BREATHE: return z.spread !== 0;
+      default: return false;
+    }
   }
 
   // ------------------------------------------------------------ scene I/O
@@ -269,11 +281,14 @@
       const z = s.zones[zl & LF.ZONE_MASK];
       out[0] = out[1] = out[2] = 0;
       if (z.effect === FX.OFF || z.effect >= FX.COUNT) return out;
-      const ph16 = phase16(t, z.speed), ph8 = ph16 >> 8;
+      // time phase; ZF.PINGPONG: triangle at the same speed (bit 16 of the phase = backward half)
+      const ph32 = phase32(t, z.speed), ph8 = (ph32 >>> 8) & 0xFF;
+      const pp = (z.flags & ZF.PINGPONG) !== 0, back = pp && (ph32 & 0x10000) !== 0;
+      const pp8 = back ? 255 - ph8 : ph8;
       const rev = (z.flags & ZF.REVERSE) !== 0;
       const lo = Math.min(z.vMin, z.vMax), hi = Math.max(z.vMin, z.vMax), rng = hi - lo;
       const c = this._c, acc = this._acc;
-      let scroll = (z.effect === FX.FLOW || (z.flags & ZF.SRC_SCROLL)) ? ph8 : 0;
+      let scroll = (z.effect === FX.FLOW || (z.flags & ZF.SRC_SCROLL)) ? pp8 : 0;
       if (rev) scroll = (0 - scroll) & 0xFF;
       switch (z.source) {
         case SRC.ZONE: c[0] = z.color[0]; c[1] = z.color[1]; c[2] = z.color[2]; break;
@@ -289,7 +304,8 @@
       }
       const a = this.zoneAxis(s, z, led, z.axis);
       const sp = ((a * z.spread) >> 4) & 0xFF;
-      const theta = rev ? (ph8 + sp) & 0xFF : (ph8 - sp) & 0xFF;
+      const tph = pingpongFx(z) ? pp8 : ph8;
+      const theta = rev ? (tph + sp) & 0xFF : (tph - sp) & 0xFF;
       const accentOf = () => { if (isBlack(z.color)) { acc[0] = c[0]; acc[1] = c[1]; acc[2] = c[2]; } else { acc[0] = z.color[0]; acc[1] = z.color[1]; acc[2] = z.color[2]; } };
       switch (z.effect) {
         case FX.STATIC: case FX.FLOW: scaleRgb(c, hi); break;
@@ -309,13 +325,13 @@
         }
         case FX.COLOR_CYCLE: hueShift(c, theta); scaleRgb(c, hi); break;
         case FX.SPARKLE: {
-          const r = this.randSlot(phase32(t, z.speed), led, 11, z.p1);
+          const r = this.randSlot(ph32, led, 11, z.p1);
           accentOf(); scaleRgb(c, lo);
           if (r.fire) { let e = 255 - r.pos; e = scale8(e, e); scaleRgb(acc, hi); lerpRgb(c, acc, e); }
           break;
         }
         case FX.RAINDROPS: {
-          const r = this.randSlot(phase32(t, z.speed), led, 12, z.p1);
+          const r = this.randSlot(ph32, led, 12, z.p1);
           accentOf(); if (isBlack(z.color)) hueShift(acc, z.p2);
           scaleRgb(c, hi);
           if (r.fire) { scaleRgb(acc, hi); lerpRgb(c, acc, tri8(r.pos)); }
@@ -323,7 +339,7 @@
         }
         case FX.CANDLE: {
           const o = hash32(led + 0x9E37) & 0xFFFF;
-          const tt = (phase32(t, z.speed) + o) % 4294967296;
+          const tt = (ph32 + o) % 4294967296;
           const k = tt >>> 10, f = (tt >>> 2) & 0xFF;
           const n0 = hash32((k ^ (led << 24)) >>> 0) & 0xFF;
           const n1 = hash32(((k + 1) ^ (led << 24)) >>> 0) & 0xFF;
@@ -332,9 +348,17 @@
         case FX.COMET: {
           const n = z.p2 === 0 ? 1 : Math.min(8, z.p2);
           const seg = Math.floor(256 / n), tail = z.p1 === 0 ? 1 : z.p1;
-          const head = rev ? (0 - ph8) & 0xFF : ph8;
-          const d = rev ? (a - head) & 0xFF : (head - a) & 0xFF;
-          const dm = d % seg;
+          let dm; // phase steps since a comet head passed this LED
+          if (pp) {
+            // back and forth: the tail is the path the head really took (see hc_engine.c)
+            const u = (rev !== back) ? 255 - a : a;
+            dm = ((ph8 - u) & 0xFF) % seg;
+            if (dm > ph8) dm = ph8 + (u % seg);
+          } else {
+            const head = rev ? (0 - ph8) & 0xFF : ph8;
+            const d = rev ? (a - head) & 0xFF : (head - a) & 0xFF;
+            dm = d % seg;
+          }
           let e = 0;
           if (dm < tail) { e = 255 - Math.floor((dm * 255) / tail); e = scale8(e, e); }
           scaleRgb(c, lo + scale8(e, rng)); break;
@@ -454,7 +478,7 @@
   }
 
   const api = { KEY_LEDS, HALO_LEDS, LED_COUNT, ZONES, GRADIENTS, GRAD_STOPS, MAX_HITS, MAGIC, SCENE_VERSION, SCENE_BYTES, ZONE_BYTES, GRAD_BYTES,
-    FX, SRC, AXIS, RX, ZF, SF, LF, HcEngine, blankScene, blankZone, blankGradient, defaultScene, sceneToBytes, sceneFromBytes, cloneScene,
+    FX, SRC, AXIS, RX, ZF, GF, SF, LF, HcEngine, blankScene, blankZone, blankGradient, defaultScene, sceneToBytes, sceneFromBytes, cloneScene,
     zoneToBytes, zoneFromBytes, gradToBytes, gradFromBytes, util: { scale8, lerp8, sin8, hash32, phase16, atan2_8, isqrt32, hsv2rgb, rgb2hsv, gradSample } };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.HC = api;
 })(typeof self !== 'undefined' ? self : this);

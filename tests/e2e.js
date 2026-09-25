@@ -119,6 +119,62 @@ let packets = 0;
   await p.click('#quickSel >> text="All"');
   const sa = await p.evaluate(() => [HaloStudio.state.sel.size, [91, 92, 127].some((l) => HaloStudio.state.sel.has(l))]);
   ok(sa[0] === 125 && !sa[1], 'unfitted halo LEDs are left out of quick-selects', JSON.stringify(sa));
+  // 8h. "Halo front" takes in the 3-LED strip between Fn and Left; "Badge" is gone
+  await p.click('#quickSel >> text="Halo front"');
+  ok(await p.evaluate(() => [88, 89, 90].every((l) => HaloStudio.state.sel.has(l))), 'Halo front includes the strip between Fn and Left');
+  ok(!(await p.$('#quickSel >> text="Badge"')), 'there is no Badge quick-select');
+
+  // 9. Zones and Gradients tab controls
+  await p.click('#tabs button[data-tab=zones]'); await p.click('.zbtn >> nth=0');
+  const zone = () => p.evaluate(() => { const z = HaloStudio.state.scene.zones[HaloStudio.state.zone]; return { flags: z.flags, speed: z.speed }; });
+  const setFx = (id) => p.selectOption('select[aria-label="Effect"]', String(id));
+  const ppIn = '[data-k=pingpong] input';
+  // 9a. Back and forth = zone flag 8 (HC.ZF.PINGPONG); it only applies to effects that move
+  await setFx(3); // Wave
+  ok(!(await p.isDisabled(ppIn)), 'Back and forth is enabled for Wave');
+  const f0 = (await zone()).flags;
+  await p.click(ppIn); await p.waitForTimeout(1200);
+  const f1 = (await zone()).flags;
+  ok((f1 & 8) === 8 && (f1 & ~8) === (f0 & ~8), 'Back and forth sets zone flag 8 (and nothing else)', `${f0} -> ${f1}`);
+  await cmp('... and the keyboard got it: firmware RAM == GUI', 'SCENE');
+  await p.click(ppIn);
+  const f2 = (await zone()).flags;
+  ok((f2 & 8) === 0 && (f2 & ~8) === (f0 & ~8), 'unticking Back and forth clears zone flag 8', `${f1} -> ${f2}`);
+  await setFx(0); // Static
+  ok(await p.isDisabled(ppIn), 'Back and forth is disabled for Static');
+  // 9b. Speed: drawing the slider never rewrites a stored byte (250 isn't a slider stop)
+  await setFx(3);
+  const kept = await p.evaluate(() => { const z = HaloStudio.state.scene.zones[HaloStudio.state.zone]; z.speed = 250; document.querySelector('.zbtn').click(); return z.speed; });
+  ok(kept === 250, 'showing the Speed slider leaves a stored speed byte alone', String(kept));
+  // 9c. the slider is linear in cycle time: its midpoint is halfway between the slowest
+  // (speed 0) and fastest (255) cycle, rounded to the nearest byte. cycle = 262144 / (speed + 16) ms
+  const slowMs = 262144 / 16, fastMs = 262144 / 271, wantByte = Math.round(262144 / ((slowMs + fastMs) / 2) - 16), wantS = 262144 / (wantByte + 16) / 1000;
+  const mid = await p.evaluate(() => {
+    const i = document.querySelector('input[data-k=speed]'); i.value = String((+i.min + +i.max) / 2); i.dispatchEvent(new Event('input', { bubbles: true }));
+    return { speed: HaloStudio.state.scene.zones[HaloStudio.state.zone].speed, shown: i.closest('.field').querySelector('output').textContent };
+  });
+  ok(mid.speed === wantByte && Math.abs(parseFloat(mid.shown) - wantS) < 0.01, `Speed slider midpoint = ${wantS.toFixed(2)} s (speed ${wantByte}), not 1.9 s`, JSON.stringify(mid));
+  // 9d. hover help on the Zones tab
+  const tips = await p.$$eval('#tabbody [data-tip]', (a) => a.filter((e) => e.dataset.tip.length > 20).length);
+  ok(tips >= 20, `Zones tab explains its terms on hover (${tips} elements with data-tip)`);
+  await p.hover('#tabbody label:text-is("Min bright")'); await p.waitForTimeout(800);
+  const tipText = await p.evaluate(() => { const t = document.getElementById('tip'); return t.hidden ? '(hidden)' : t.textContent; });
+  ok(/brightness/.test(tipText), 'hovering a label shows its help', tipText);
+  // 9e. gradient flags: MIRROR (2) and WRAP (1) are separate checkboxes
+  await p.click('#tabs button[data-tab=gradients]');
+  const gflags = () => p.evaluate(() => HaloStudio.state.scene.grad[HaloStudio.state.grad].flags);
+  const g0 = await gflags();
+  await p.click('[data-k=gmirror] input');
+  const g1 = await gflags();
+  ok((g1 & 2) !== (g0 & 2) && (g1 & 1) === (g0 & 1), '"Loop back through all colors" toggles gradient flag 2 only', `${g0} -> ${g1}`);
+  if (!(g1 & 2)) { await p.click('[data-k=gmirror] input'); }
+  ok(((await gflags()) & 2) === 2, '... and sets it', String(await gflags()));
+  const g2 = await gflags();
+  await p.click('[data-k=gwrap] input');
+  const g3 = await gflags();
+  ok((g3 & 1) !== (g2 & 1) && (g3 & 2) === 2, '"Blend the last color into the first" toggles gradient flag 1 only', `${g2} -> ${g3}`);
+  await p.waitForTimeout(1200);
+  await cmp('gradient flags reach the keyboard: firmware RAM == GUI', 'SCENE');
   // 8e. a keyboard without Composer firmware gets a clear message and no connection
   const p2 = await newStudioPage();
   await p2.goto(html + '?stock=1'); await p2.waitForTimeout(400);

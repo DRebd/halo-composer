@@ -107,6 +107,16 @@ input[type=color]{width:38px;height:28px;padding:0;border:1px solid var(--line2)
 .mono{font-family:var(--mono)}
 .banner{border:1px solid var(--amber);background:var(--amber-soft);color:var(--ink);border-radius:10px;padding:10px 12px;font-size:13px}
 .banner b{color:var(--amber)}
+.check.off,.field.off label{color:var(--faint)}
+.check.off input{cursor:not-allowed}
+.checks{display:flex;flex-direction:column;gap:6px}
+.checks-row{gap:6px 14px}
+.fgroup{display:flex;flex-direction:column;gap:2px}
+.fnote{margin:0 0 0 118px;font-size:12px;line-height:1.35;color:var(--muted)}
+/* hover help: labels that explain themselves get a dotted underline; the bubble is #tip */
+.field>label[data-tip],h3[data-tip],.label[data-tip],.check[data-tip]>span,.kv [data-tip]{text-decoration:underline dotted;text-decoration-color:var(--faint);text-decoration-thickness:1px;text-underline-offset:3px;cursor:help}
+.tip{position:fixed;z-index:30;max-width:300px;padding:7px 10px;border-radius:8px;background:#262a33;border:1px solid var(--line2);color:var(--ink);font:400 12.5px/1.45 var(--body);letter-spacing:0;text-transform:none;box-shadow:0 10px 28px rgba(0,0,0,.55);pointer-events:none}
+.tip[hidden]{display:none}
 @media (prefers-reduced-motion: reduce){.sw:hover{transform:none}}
 </style>
 </head>
@@ -115,22 +125,22 @@ input[type=color]{width:38px;height:28px;padding:0;border:1px solid var(--line2)
 <header class="top">
   <div class="brand"><h1>Halo <b>Studio</b></h1><span>NuPhy Halo75 V2 · Halo Composer fw</span></div>
   <span id="connPill" class="pill">Preview only</span>
-  <label class="check" title="Send every change to the keyboard's RAM as you edit"><input type="checkbox" id="livePush" checked> Live push</label>
-  <button class="btn" id="btnConnect">Connect keyboard</button>
-  <button class="btn" id="btnRevert" disabled title="Reload the last saved scene from the keyboard">Revert</button>
-  <button class="btn primary" id="btnSave" disabled title="Write the current scene to the keyboard's EEPROM">Save to keyboard</button>
+  <label class="check" data-tipkey="livePush"><input type="checkbox" id="livePush" checked><span>Live push</span></label>
+  <button class="btn" id="btnConnect" data-tipkey="connect">Connect keyboard</button>
+  <button class="btn" id="btnRevert" disabled data-tipkey="revert">Revert</button>
+  <button class="btn primary" id="btnSave" disabled data-tipkey="save">Save to keyboard</button>
 </header>
 <main class="grid">
   <section class="stage">
     <div class="stage-card"><canvas id="kb" width="1200" height="520" aria-label="Keyboard preview. Click LEDs to select them."></canvas></div>
     <div class="stage-bar">
-      <span class="label">Tool</span>
-      <div class="seg" id="toolSeg"><button data-tool="select" class="on">Select</button><button data-tool="paint">Paint</button><button data-tool="pick">Eyedropper</button><button data-tool="type">Type (test reactive)</button></div>
-      <span class="label" style="margin-left:10px">Show</span>
-      <div class="seg" id="viewSeg"><button data-view="live" class="on">Live</button><button data-view="base">Base colors</button><button data-view="zones">Zones</button></div>
+      <span class="label" data-tipkey="tool">Tool</span>
+      <div class="seg" id="toolSeg"><button data-tool="select" class="on" data-tipkey="toolSelect">Select</button><button data-tool="paint" data-tipkey="toolPaint">Paint</button><button data-tool="pick" data-tipkey="toolPick">Eyedropper</button><button data-tool="type" data-tipkey="toolType">Type (test reactive)</button></div>
+      <span class="label" style="margin-left:10px" data-tipkey="show">Show</span>
+      <div class="seg" id="viewSeg"><button data-view="live" class="on" data-tipkey="showLive">Live</button><button data-view="base" data-tipkey="showBase">Base colors</button><button data-view="zones" data-tipkey="showZones">Zones</button></div>
     </div>
     <div class="stage-bar">
-      <span class="label">Select</span>
+      <span class="label" data-tipkey="select">Select</span>
       <div class="row" id="quickSel"></div>
     </div>
     <div class="stage-bar">
@@ -138,11 +148,11 @@ input[type=color]{width:38px;height:28px;padding:0;border:1px solid var(--line2)
       <span class="stats" id="stats" style="margin-left:auto"></span>
     </div>
     <div class="stage-bar">
-      <span class="label">Preview</span>
-      <label class="check"><input type="checkbox" id="pvPlay" checked> Animate</label>
-      <label class="check"><input type="checkbox" id="pvTyping"> Simulated typing</label>
-      <label class="check" style="gap:6px">Key brightness <input type="range" id="pvKeys" min="0" max="255" value="255" style="width:110px"></label>
-      <label class="check" style="gap:6px">Halo level (Fn+M+↑/↓) <input type="range" id="pvHalo" min="0" max="5" value="5" style="width:80px"></label>
+      <span class="label" data-tipkey="preview">Preview</span>
+      <label class="check" data-tipkey="animate"><input type="checkbox" id="pvPlay" checked><span>Animate</span></label>
+      <label class="check" data-tipkey="typing"><input type="checkbox" id="pvTyping"><span>Simulated typing</span></label>
+      <label class="check" style="gap:6px" data-tipkey="keyBright"><span>Key brightness</span> <input type="range" id="pvKeys" min="0" max="255" value="255" style="width:110px"></label>
+      <label class="check" style="gap:6px" data-tipkey="haloLevel"><span>Halo level (Fn+M+↑/↓)</span> <input type="range" id="pvHalo" min="0" max="5" value="5" style="width:80px"></label>
     </div>
   </section>
   <aside class="panel">
@@ -160,6 +170,7 @@ input[type=color]{width:38px;height:28px;padding:0;border:1px solid var(--line2)
 </main>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="tip" id="tip" role="tooltip" hidden></div>
 <script>/*__GEOM__*/</script>
 <script>/*__ENGINE__*/</script>
 <script>/*__APP__*/</script>

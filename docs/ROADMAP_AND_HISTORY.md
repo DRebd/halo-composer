@@ -16,7 +16,19 @@ Terms used below (others, such as QMK and VIA, are in the README's [plain-Englis
 
 ## Roadmap
 
-Nothing below has been started. Effort figures are rough estimates unless marked otherwise. They come from reading the firmware source, not from building the features. Anything that needs the computer (streaming, notifications, meters) works over USB only, because the keyboard's wireless chip carries only keystrokes, mouse and media keys.
+Apart from Studio's hover help, a first step toward the first item, nothing below has been started. Effort figures are rough estimates unless marked otherwise. They come from reading the source, not from building the features. Anything that needs the computer (streaming, notifications, meters) works over USB only, because the keyboard's wireless chip carries only keystrokes, mouse and media keys.
+
+### Simplify Studio
+
+**The top priority, and the biggest, hardest and most important item on this page.** The capability is already there: a scene can combine per-LED colors, 8 zones of effects, gradients and keypress reactions. But Halo Studio shows nearly every setting at once, and the settings interact in ways that aren't obvious. What Speed, Min bright, Max bright, Spread and the accent color do all depends on the chosen effect and color source. Reaching a particular look takes too much trial and error.
+
+**Goal:** smart defaults, plus single "levers" that each drive several related settings at once, without ever removing the advanced, granular options. One way to get there is *progressive disclosure*: a simple view first, with the full controls available on demand.
+
+- **Dial in every starter scene.** On most of them, the timing and colors are slightly off.
+- **Options that adapt.** Controls that don't apply should gray out or change to match the current choices, such as a keypress overlay or an effect parameter that does nothing with the selected effect. *Back and forth* and *Speed* already gray out where they don't apply.
+- **Help inside Studio,** alongside these documents. Hover help, a short explanation on most labels and buttons, is in place. Next is fuller guidance inside the editor.
+
+**Effort:** large and open-ended; almost all of it is design work in Studio (estimate).
 
 ### Several stored scenes on the keyboard
 
@@ -24,7 +36,7 @@ Nothing below has been started. Effort figures are rough estimates unless marked
 
 **Recommended design** (worked out from the firmware source):
 
-- **Keep scenes in unused flash**, not in the emulated EEPROM. About 39 KB of flash is unused. The top 5 free pages (10 KB) would hold **8 full scenes** (4 pages × 2 scenes) plus 1 spare page, with the halo calibration stored once. 16 scenes would fit in about 18 KB.
+- **Keep scenes in unused flash**, not in the emulated EEPROM. About 38 KB of flash is unused. The top 5 free pages (10 KB) would hold **8 full scenes** (4 pages × 2 scenes) plus 1 spare page, with the halo calibration stored once. 16 scenes would fit in about 18 KB.
 - **Benefits:**
   - The saved scene leaves the EEPROM, so VIA gets its macro space back (about 2,390 bytes, up from 1,485).
   - Scenes should **survive firmware updates**. Holding Esc to flash wipes only the EEPROM pages. Whether QMK Toolbox also leaves the other flash pages alone still has to be confirmed on a keyboard.
@@ -46,6 +58,14 @@ Nothing below has been started. Effort figures are rough estimates unless marked
 **Studio-sync caveat.** Studio sends only the parts of a scene that changed. If a scene is switched on the keyboard while Studio is editing, the keyboard would end up with a mix of both. The fix is protocol version 2: the keyboard reports a scene-change counter and the active slot, and Studio re-reads the scene when either changes. Optionally, the keyboard could ignore slot keys for about 10 seconds after Studio's last command.
 
 **RAM isn't the limit.** Only one scene (915 bytes) is ever in RAM; the others are read straight from flash. For the same reason, crossfading between two stored scenes isn't practical: a second scene in RAM would take 915 of the 1,496 free bytes.
+
+### 8 gradients, one per zone
+
+**Why:** today a scene holds 4 shared gradients, so at most 4 zones can each have a gradient of their own.
+
+- **Cost:** each gradient takes 26 bytes, so 4 more add 104 bytes per scene (915 → 1,019). While the scene lives in the EEPROM, VIA macro space would drop from about 1,485 to about 1,380 bytes. Free RAM would drop from about 1,496 to about 1,390 bytes.
+- **The change:** a new scene format version, with older exported `.halo.json` files converted on import.
+- **Plan:** do it together with [several stored scenes](#several-stored-scenes-on-the-keyboard), which needs the same kind of format migration anyway.
 
 ### Battery gauge on the function row
 
@@ -94,6 +114,7 @@ Making the stock effects editable means rewriting all 42 with new settings. The 
 
 ## Known limitations and open questions
 
+- **Halo Studio takes trial and error.** Every setting is there, but many interact, and most starter scenes still need fine-tuning. Fixing that is the top roadmap item, [Simplify Studio](#simplify-studio).
 - **Editing is USB-only.** Halo Studio and VIA need the USB cable with the keyboard in wired mode, because the wireless chip carries only keystrokes, mouse and media keys. Saved lighting runs in every mode.
 - **One saved scene on the keyboard.** Studio keeps any number of scenes in the browser and can export and import them as `.halo.json` files. Several scenes on the keyboard are on the [roadmap](#several-stored-scenes-on-the-keyboard).
 - **Flashing with Esc held resets saved settings, including the scene.** The default look and the measured halo layout are built into the firmware, so they come back by themselves. A custom scene has to be exported (or backed up with `tools/halo_kb.py scene-backup`) before flashing and restored afterwards. [FLASHING.md](FLASHING.md) covers this.
@@ -116,7 +137,9 @@ Making the stock effects editable means rewriting all 42 with new settings. The 
 
 ### Why this project exists
 
-The Halo75 V2 ships with QMK firmware and works with VIA, but its lighting control is thin: one backlight color for all keys, and a halo limited to NuPhy's fixed modes and 8 preset colors, whose Breath mode fades fully to off. No existing firmware kept per-key shades on the keyboard itself (SignalRGB can do it only while its desktop app runs), or let the halo breathe between, say, 50% and 100%. Halo Composer adds that on top of ryodeushii's community firmware, and Halo Studio is its editor.
+The Halo75 V2 ships with QMK firmware and works with VIA, but its lighting control is thin: one backlight color for all keys, and a halo limited to NuPhy's fixed modes and 8 preset colors. No existing firmware let you design the lighting LED by LED and keep it on the keyboard itself (SignalRGB can color keys individually only while its desktop app runs).
+
+Halo Composer replaces that with a lighting engine of its own, built on ryodeushii's community firmware. Each scene gives every key and halo LED its own color, runs up to 8 zones with their own effects, speeds and brightness ranges over those colors, and plays keypress reactions on top, all at once. Halo Studio is the editor for designing those scenes in the browser.
 
 ### Why NuPhy's "QMK/VIA" feels hollow
 
@@ -134,8 +157,8 @@ The Halo75 V2 really does run QMK: NuPhy publishes its source under the GPL, and
 
 | Option | Verdict |
 |---|---|
-| NuPhy stock 2.1.5 | One color for all keys; the halo is limited to 8 colors, and Breath fades fully off. It remains the way back to factory firmware. |
-| ryodeushii prebuilt ryo-1.1.4 (September 2024) | Adds a VIA halo color menu, but still no per-key shades, and Breath still fades to off. |
+| NuPhy stock 2.1.5 | One color for all keys; the halo is limited to NuPhy's fixed modes and 8 colors. It remains the way back to factory firmware. |
+| ryodeushii prebuilt ryo-1.1.4 (September 2024) | Adds a VIA halo color menu, but still no per-key color, and the halo still runs as one strip in NuPhy's modes. |
 | ryodeushii source (July 2026, unreleased) | **The base used here:** newer QMK, fixes, SignalRGB support. |
 | SignalRGB (with ryodeushii's `srgb` build) | Full control, but only while the desktop app is running. |
 | NuPhyIO, NuPhy Console, Vial, OpenRGB | Not available for this board. NuPhyIO is for the separate IO-series Halo75 V2. |

@@ -24,6 +24,10 @@ ABSENT_HALO = (8, 9, 44)
 # hc_scene_t layout (packed, little-endian)
 OFF_COLOR, OFF_ZONE_OF, OFF_ZONES, OFF_GRAD, OFF_HALO_XY, OFF_HALO_RING = 4, 388, 516, 676, 780, 870
 SCENE_BYTES = 915
+# flag bytes: zone byte 8 (HC_ZF_*), gradient byte 1 (HC_GF_*); the firmware stores them as sent
+ZONE_FLAGS_AT, GRAD_FLAGS_AT = 8, 1
+ZF_REVERSE, ZF_SRC_SCROLL, ZF_MIRROR, ZF_PINGPONG = 0x01, 0x02, 0x04, 0x08
+GF_WRAP, GF_MIRROR = 0x01, 0x02
 
 
 class ProtocolError(RuntimeError):

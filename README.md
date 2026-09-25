@@ -1,18 +1,22 @@
 # Halo Composer
 
-**Per-LED lighting for the NuPhy Halo75 V2.** Halo Composer is a replacement keyboard firmware, and **Halo Studio** is the browser editor that goes with it. Together they let you:
+**Per-LED lighting for the NuPhy Halo75 V2.** Halo Composer is a replacement keyboard firmware with its own lighting engine, and **Halo Studio** is the browser editor that goes with it. A Composer scene combines all of this at the same time:
 
-- color **every LED individually**: the 83 key LEDs and all 42 "halo" LEDs around the base;
-- apply **effects that keep your colors** (breathe, wave, candle, comet, ripple, ...) instead of replacing them;
-- split the board into **up to 8 zones**, each with its own effect, speed and brightness range: for example, keys that flash on every press while the halo breathes slowly between 30% and 100%;
-- use **multi-color gradients**, keypress reactions, starter scenes, and a live preview that uses the same lighting math as the keyboard.
+- **a color for every LED**: the 83 key LEDs and all 42 "halo" LEDs around the base;
+- **up to 8 zones**, each running its own effect (17 of them, from breathe and candle to comet and ripple) at its own speed and brightness range. Effects animate your colors, or a gradient or rainbow, instead of replacing them, and moving ones can run back and forth;
+- **keypress reactions** on top: flash, glow, ripple, or an echo on the halo.
+
+For example: warm white keys that flash and ripple when pressed, WASD pulsing in its own color, and a halo breathing slowly between 30% and 100%. You design it live in Halo Studio, whose preview uses the same lighting math as the keyboard, or start from one of 11 starter scenes. The keyboard then runs it on its own.
 
 <p align="center">
-  <img src="docs/media/aurora-drift.gif" width="760" alt="Halo Studio preview: an aurora gradient drifting across the keys and around the halo">
+  <img src="docs/media/studio-hero.gif" alt="Halo Studio in the browser: an aurora gradient of green, blue and violet flows across the keys and around the halo, next to the Zones panel with the Keys zone set to Flow">
+  <!-- Still alternative: <img src="docs/media/studio-hero.png" alt="Halo Studio in the browser: an aurora gradient of green, blue and violet across the keys and around the halo, next to the Zones panel with the Keys zone set to Flow"> -->
 </p>
 
 > [!WARNING]
 > **This is a brand-new project.** It runs well on the developer's Halo75 V2 (ANSI), but it hasn't been tested much beyond that. You can always flash NuPhy's official firmware back (the [install guide](docs/FLASHING.md) links it).
+>
+> The lighting goes far beyond what the stock firmware can do, but Halo Studio's controls, and the way the LED settings interact, still need a lot of simplifying. That's the [top roadmap item](docs/ROADMAP_AND_HISTORY.md#simplify-studio).
 
 ## Get started
 
@@ -23,14 +27,16 @@
 ## Halo Studio
 
 <p align="center">
-  <img src="docs/media/studio-zones.png" width="880" alt="Halo Studio: the keyboard preview on the left, the Zones panel on the right">
+  <img src="docs/media/studio-zones.png" width="880" alt="Halo Studio with the factory look: warm white keys, a few flashing mint after keypresses, and the Zones panel editing the halo zone's Breathe effect">
 </p>
 
-| Keypress reactions | Comets orbiting the halo |
+| Keypress reactions: glows follow your typing | Comets orbiting the halo |
 |---|---|
-| <img src="docs/media/synthwave-typing.gif" alt="Synthwave scene: sunset keys with soft glows on each keypress"> | <img src="docs/media/ember-comet.gif" alt="Ember Comet scene: two ember comets travelling around the halo"> |
-| **The factory look:** 2700K keys, a mint flash and short ripple on each press | **Effects gallery:** every effect with a live preview |
-| <img src="docs/media/warm-desk-typing.gif" alt="Factory look: warm white keys flashing mint when pressed"> | <img src="docs/media/studio-effects.png" alt="The Effects tab with animated previews of each effect"> |
+| <img src="docs/media/keypress-glow.gif" alt="Synthwave scene: sunset-gradient keys light up in soft cyan glows as a word is typed, while the halo flows in pink, violet and blue"><!-- Still: <img src="docs/media/keypress-glow.png" alt="Synthwave scene: sunset-gradient keys with soft cyan glows around recently typed keys"> --> | <img src="docs/media/comet-orbit.gif" alt="Two ember comets with fading tails orbit the halo around warm ember-lit keys"><!-- Still: <img src="docs/media/comet-orbit.png" alt="Two ember comets with fading tails on the halo around warm ember-lit keys"> --> |
+| **The factory look:** 2700K keys, a mint flash and short ripple on each press, a breathing halo | **Back and forth:** a comet sweeps across the board and back |
+| <img src="docs/media/factory-look.gif" alt="The factory look: warm white keys flash mint as a phrase is typed while the warm halo breathes"><!-- Still: <img src="docs/media/factory-look.png" alt="The factory look: warm white keys, several flashing mint, and a bright warm halo"> --> | <img src="docs/media/back-and-forth.gif" alt="A comet shading from blue to magenta sweeps left to right across the keys and halo, then back, its tail trailing behind"><!-- Still: <img src="docs/media/back-and-forth.png" alt="A cyan comet crossing the middle of the keyboard, its tail trailing behind"> --> |
+| **Gradients:** up to 6 color stops each | **Effects gallery:** every effect with a live preview |
+| <img src="docs/media/studio-gradients.png" alt="The Gradients tab: four gradient slots and the color stops of the aurora gradient"> | <img src="docs/media/studio-effects.png" alt="The Effects tab with animated previews of each effect"> |
 | **Paint and select** any LED, or use one-click groups | **Halo setup:** place each halo LED on the drawing |
 | <img src="docs/media/studio-paint.png" alt="The Paint tab with color swatches and the WASD keys selected"> | <img src="docs/media/studio-halo-setup.png" alt="The Halo setup tab while placing halo LEDs"> |
 
@@ -54,8 +60,8 @@
 | **QMK** | The open-source keyboard firmware the Halo75 V2 runs. |
 | **VIA** | A website (usevia.app) that remaps keys on QMK keyboards. It still works with this firmware. |
 | **ryodeushii's firmware** | A community-maintained, improved version of NuPhy's QMK firmware. Halo Composer is built on top of it. |
-| **Halo** | The light strip around the base, plus the small status bar and badge LEDs: 45 LED positions, 42 of them fitted. |
-| **Zone** | A group of LEDs that share one effect, speed and brightness range. You choose which LEDs go in which zone. |
+| **Halo** | The light strip around the edge of the base, plus the 5-LED status bar and a short 3-LED strip between the Fn and ← keys: 45 LED positions, 42 of them fitted. |
+| **Zone** | A group of LEDs that share one effect, speed, brightness range and keypress reaction. You choose which LEDs go in which zone. |
 | **Scene** | Everything about a look: per-LED colors, zones, gradients and the halo layout. The keyboard stores one saved scene; Studio can keep as many as you like. |
 | **EEPROM** | The keyboard's small permanent memory. "Save to keyboard" writes the scene there so it survives unplugging. |
 | **WebHID** | The browser feature (Chrome/Edge) that lets a web page talk to a USB device after you approve it in a pop-up. |
@@ -86,6 +92,15 @@ The editor talks to the keyboard only over the **USB cable in wired mode**; the 
 | `docs/` | The guides above, plus `media/` for the README images |
 
 Every update to the project on GitHub is built and tested automatically: the firmware must compile, Halo Studio's preview must produce exactly the same LED values as the firmware's engine, and the editor is driven end to end against a simulated keyboard. Those checks catch software mistakes; they don't replace trying it on real keyboards. Each automatic build is labeled *UNTESTED-on-hardware* on the [Actions tab](https://github.com/DRebd/halo-composer/actions); files that have been run on a real keyboard are published on the [Releases page](https://github.com/DRebd/halo-composer/releases).
+
+## Future improvements
+
+- **Simplify Studio**, the top priority: smart defaults and single controls that set several related settings at once, with every advanced option kept.
+- **Several scenes on the keyboard**, switched with Cmd+Fn+1…8 without opening Studio.
+- **A battery gauge across the function row**: Esc to F12 lit as a charge bar.
+- **A halo that follows the screen or the music**, streamed from the computer over USB.
+
+The full list, with rough costs and the known limitations: [docs/ROADMAP_AND_HISTORY.md](docs/ROADMAP_AND_HISTORY.md).
 
 ## Credits and license
 

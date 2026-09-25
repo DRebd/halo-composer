@@ -179,6 +179,16 @@ static bool is_black(const uint8_t c[3]) {
 }
 
 void hc_grad_sample(const hc_gradient_t *g, uint8_t pos, uint8_t out[3]) {
+    // HC_GF_MIRROR: fold the position first, so stops A,B,C,D play A B C D C B A across
+    // 0..255. m = min(pos, 255 - pos) is 0..127 and exactly symmetric (pos and 255 - pos
+    // sample the same point); m * 515 / 256 stretches it back to 0..255 without a division,
+    // so pos 0 and 255 land exactly on stop space 0 and pos 127 and 128 exactly on 255.
+    // HC_GF_WRAP keeps its meaning on the folded position: with both bits set, the wrapped
+    // loop (..., last stop -> blend back to the first) plays forward and then backward.
+    if (g->flags & HC_GF_MIRROR) {
+        uint8_t m = pos < 128 ? pos : (uint8_t)(255 - pos);
+        pos       = (uint8_t)(((uint16_t)m * 515u) >> 8);
+    }
     uint8_t n = g->count;
     if (n > HC_GRAD_STOPS) n = HC_GRAD_STOPS;
     if (n == 0) {
@@ -190,7 +200,7 @@ void hc_grad_sample(const hc_gradient_t *g, uint8_t pos, uint8_t out[3]) {
         out[0] = st[0].r; out[1] = st[0].g; out[2] = st[0].b;
         return;
     }
-    bool    wrap = (g->flags & 1) != 0;
+    bool    wrap = (g->flags & HC_GF_WRAP) != 0;
     uint8_t i    = 0;
     while (i < n && st[i].pos <= pos) i++;
     const hc_stop_t *a;
@@ -338,6 +348,24 @@ static uint8_t band8(uint8_t theta, uint8_t p1) {
     return hc_sin8((uint8_t)(64u + (d * 128u) / w));
 }
 
+// Effects whose time phase HC_ZF_PINGPONG turns into a triangle: the ones where something
+// travels along the axis (Breathe only as a travelling wave). The colour-source scroll is
+// handled separately and follows the flag for every effect.
+static bool pingpong_fx(const hc_zone_t *z) {
+    switch (z->effect) {
+        case HC_FX_WAVE:
+        case HC_FX_SATWAVE:
+        case HC_FX_COLOR_CYCLE:
+        case HC_FX_FLOW:
+        case HC_FX_COMET:
+            return true;
+        case HC_FX_BREATHE:
+            return z->spread != 0;
+        default:
+            return false;
+    }
+}
+
 static uint16_t dist_to(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
     int32_t dx = (int32_t)x1 - x0;
     int32_t dy = (int32_t)y1 - y0;
@@ -350,8 +378,14 @@ void hc_render_led(const hc_scene_t *s, const hc_state_t *st, uint8_t led, uint3
     out[0] = out[1] = out[2] = 0;
     if (z->effect == HC_FX_OFF || z->effect >= HC_FX_COUNT) return;
 
-    const uint16_t ph16 = hc_phase16(t, z->speed);
-    const uint8_t  ph8  = (uint8_t)(ph16 >> 8);
+    // Time phase: one cycle = 65536 phase steps, ph8 = 0..255 across it (the low 16 bits are
+    // hc_phase16()). HC_ZF_PINGPONG makes the sawtooth a triangle at the same speed: ph8 runs
+    // 0..255 in one cycle, then 255..0 in the next; bit 16 of the phase says which half.
+    const uint32_t ph32 = phase32(t, z->speed);
+    const uint8_t  ph8  = (uint8_t)(ph32 >> 8);
+    const bool     pp   = (z->flags & HC_ZF_PINGPONG) != 0;
+    const bool     back = pp && (ph32 & 0x10000u) != 0; // in the backward half
+    const uint8_t  pp8  = back ? (uint8_t)(255 - ph8) : ph8;
     const bool     rev  = (z->flags & HC_ZF_REVERSE) != 0;
     const uint8_t  lo   = z->v_min < z->v_max ? z->v_min : z->v_max;
     const uint8_t  hi   = z->v_min < z->v_max ? z->v_max : z->v_min;
@@ -359,7 +393,7 @@ void hc_render_led(const hc_scene_t *s, const hc_state_t *st, uint8_t led, uint3
 
     // ---- base colour
     uint8_t c[3];
-    uint8_t scroll = (z->effect == HC_FX_FLOW || (z->flags & HC_ZF_SRC_SCROLL)) ? ph8 : 0;
+    uint8_t scroll = (z->effect == HC_FX_FLOW || (z->flags & HC_ZF_SRC_SCROLL)) ? pp8 : 0;
     if (rev) scroll = (uint8_t)(0 - scroll);
     switch (z->source) {
         case HC_SRC_ZONE:
@@ -385,7 +419,8 @@ void hc_render_led(const hc_scene_t *s, const hc_state_t *st, uint8_t led, uint3
     // ---- effect
     const uint8_t a     = zone_axis(s, z, led, z->axis);
     const uint8_t sp    = (uint8_t)(((uint16_t)a * z->spread) >> 4);
-    const uint8_t theta = rev ? (uint8_t)(ph8 + sp) : (uint8_t)(ph8 - sp);
+    const uint8_t tph   = pingpong_fx(z) ? pp8 : ph8;
+    const uint8_t theta = rev ? (uint8_t)(tph + sp) : (uint8_t)(tph - sp);
     uint8_t       acc[3];
 
     switch (z->effect) {
@@ -436,7 +471,7 @@ void hc_render_led(const hc_scene_t *s, const hc_state_t *st, uint8_t led, uint3
 
         case HC_FX_SPARKLE: {
             uint8_t pos;
-            bool    fire = rand_slot(phase32(t, z->speed), led, 11, z->p1, &pos);
+            bool    fire = rand_slot(ph32, led, 11, z->p1, &pos);
             accent_of(z, c, acc);
             scale_rgb(c, lo);
             if (fire) {
@@ -450,7 +485,7 @@ void hc_render_led(const hc_scene_t *s, const hc_state_t *st, uint8_t led, uint3
 
         case HC_FX_RAINDROPS: {
             uint8_t pos;
-            bool    fire = rand_slot(phase32(t, z->speed), led, 12, z->p1, &pos);
+            bool    fire = rand_slot(ph32, led, 12, z->p1, &pos);
             accent_of(z, c, acc);
             if (is_black(z->color)) hue_shift(acc, z->p2);
             scale_rgb(c, hi);
@@ -463,7 +498,7 @@ void hc_render_led(const hc_scene_t *s, const hc_state_t *st, uint8_t led, uint3
 
         case HC_FX_CANDLE: {
             uint32_t o  = hc_hash32((uint32_t)led + 0x9E37u) & 0xFFFFu;
-            uint32_t tt = phase32(t, z->speed) + o;
+            uint32_t tt = ph32 + o;
             uint32_t k  = tt >> 10;
             uint8_t  f  = (uint8_t)((tt >> 2) & 0xFFu);
             uint8_t  n0 = (uint8_t)(hc_hash32(k ^ ((uint32_t)led << 24)) & 0xFFu);
@@ -476,10 +511,23 @@ void hc_render_led(const hc_scene_t *s, const hc_state_t *st, uint8_t led, uint3
             uint8_t  n    = z->p2 == 0 ? 1 : (z->p2 > 8 ? 8 : z->p2);
             uint16_t seg  = (uint16_t)(256u / n);
             uint8_t  tail = z->p1 == 0 ? 1 : z->p1;
-            uint8_t  head = rev ? (uint8_t)(0 - ph8) : ph8;
-            uint8_t  d    = rev ? (uint8_t)(a - head) : (uint8_t)(head - a);
-            uint16_t dm   = (uint16_t)(d % seg);
-            uint8_t  e    = 0;
+            uint16_t dm; // phase steps since a comet head passed this LED
+            if (pp) {
+                // Back and forth: the heads bounce at the ends of the axis and each tail is the
+                // path its head really took, so at a turn the tail folds in behind the head
+                // instead of jumping to the other side. Worked in "sweep" coordinates u, which
+                // run the way the heads are going in this half; there the heads sit at
+                // ph8 + k*seg exactly as in the one-way comet. A spot no head has reached in
+                // this sweep was last passed in the previous one, before the turn at u = 0.
+                uint8_t u = (rev != back) ? (uint8_t)(255 - a) : a;
+                dm        = (uint16_t)((uint8_t)(ph8 - u) % seg);
+                if (dm > ph8) dm = (uint16_t)(ph8 + u % seg);
+            } else {
+                uint8_t head = rev ? (uint8_t)(0 - ph8) : ph8;
+                uint8_t d    = rev ? (uint8_t)(a - head) : (uint8_t)(head - a);
+                dm           = (uint16_t)(d % seg);
+            }
+            uint8_t e = 0;
             if (dm < tail) {
                 e = (uint8_t)(255u - (dm * 255u) / tail);
                 e = hc_scale8(e, e);
@@ -704,6 +752,8 @@ void hc_scene_defaults(hc_scene_t *s) {
     memcpy(s->halo_ring, hc_default_halo_ring, sizeof(s->halo_ring));
 }
 
+// Zone and gradient flags are deliberately not checked: unknown bits (a newer Studio's
+// features) are kept and ignored, so adding a flag never needs a scene-version bump.
 bool hc_scene_valid(const hc_scene_t *s) {
     if (s->magic != HC_MAGIC || s->version != HC_SCENE_VERSION) return false;
     for (uint8_t i = 0; i < HC_ZONES; i++) {

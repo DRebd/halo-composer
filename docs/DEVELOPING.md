@@ -94,8 +94,8 @@ docker run --rm -v halo-composer-qmk:/qmk -v "${PWD}:/src:ro" <QMK_IMAGE> bash /
 This builds a small test image (`tests/Dockerfile`: Playwright's Chromium image plus gcc and Python) and runs `tests/run_tests.sh`:
 
 1. The engine compiles with `-Wall -Wextra -Wconversion -Wshadow -Werror`.
-2. **Parity:** `tests/host_vectors.c` renders 80 fuzzed scenes and `tests/parity_test.mjs` replays them in the JavaScript engine. They must match byte for byte.
-3. **Protocol:** `tests/host_device.c` wraps the *real* `hc_qmk.c` + `hc_engine.c` as a simulated keyboard on stdin/stdout, and `tests/protocol_test.py` runs `tools/composer_checks.py` plus boot-guard, IDENTIFY, reactive and default-look checks against it.
+2. **Parity:** `tests/host_vectors.c` renders 88 scenes (80 fuzzed, plus 8 built around Back and forth and mirrored gradients) and runs behavior checks on the C engine; `tests/parity_test.mjs` replays the scenes in the JavaScript engine. They must match byte for byte.
+3. **Protocol:** `tests/host_device.c` wraps the *real* `hc_qmk.c` + `hc_engine.c` as a simulated keyboard on stdin/stdout, and `tests/protocol_test.py` runs 49 checks against it: `tools/composer_checks.py` plus boot-guard, IDENTIFY, reactive, default-look and flag-bit checks (the Back and forth and gradient flags survive Save, Reload and a reboot).
 4. Build Halo Studio.
 5. **End to end:** `tests/e2e.js` drives the real Studio page in headless Chrome (a browser running without a window) with a simulated WebHID device connected to that simulated keyboard, including a regression check for every bug found in review.
 
@@ -112,9 +112,9 @@ On macOS or Linux, `bash tests/run_tests.sh` runs the same steps without Docker 
 Needs Docker and **ffmpeg** (a command-line video tool) on the PATH. No keyboard is needed.
 
 - The script builds Studio into `dist\`, builds the `halo-composer-test` image from `tests/Dockerfile` (the same one `test.ps1` uses), and runs `scripts/capture_readme_media.js` in it with Playwright's Chromium.
-- The capture script replaces the preview's clock with a virtual one and advances it 1/15 s per frame, so animations come out smooth however long each screenshot takes.
-- Results go to a temporary folder (`%TEMP%\halo-media`). The PowerShell script copies the screenshots into `docs\media\` and turns each set of frames into a GIF with ffmpeg (15 fps, 760 px wide).
-- Output in `docs\media\`: `studio-zones.png`, `studio-paint.png`, `studio-effects.png`, `studio-halo-setup.png`, and 4-second GIFs `warm-desk-typing.gif`, `aurora-drift.gif`, `ember-comet.gif`, `synthwave-typing.gif`.
+- The capture script replaces the preview's clock with a virtual one and steps it frame by frame, so animations come out smooth however long each screenshot takes. Each GIF covers exactly one loop of its scene's animations (keypresses are scripted, and every reaction fades out before the loop point), so the end joins the start invisibly; the script checks this and prints a seam value (0 = perfect).
+- Results go to a temporary folder (`%TEMP%\halo-media`). The PowerShell script copies the screenshots into `docs\media\` and turns each set of frames into a GIF with ffmpeg (about 14 fps; each frame shows for 7/100 s).
+- Output in `docs\media\`: screenshots `studio-zones.png`, `studio-paint.png`, `studio-effects.png`, `studio-gradients.png`, `studio-halo-setup.png`, and seamless GIFs `studio-hero.gif` (full window), `factory-look.gif`, `comet-orbit.gif`, `keypress-glow.gif`, `back-and-forth.gif`. Each GIF has a still PNG with the same name, which can replace it in the README.
 - It also prints a `file:// check` line (secure context, WebHID, storage) for a copy of Studio opened straight from disk.
 - The capture script finds things by their labels (tab buttons, starter-scene names, "Start placing"). Renaming those in Studio means updating `capture_readme_media.js` too.
 
@@ -140,7 +140,7 @@ python tools\halo_kb.py scene-restore backups\scene.halo.json --save
 | Lighting math in `firmware/keymap/composer/hc_engine.c` | Make the identical change in `studio/hc_engine.js`, then run the tests (parity will tell you) |
 | The scene layout (`hc_scene_t`) | Bump `HC_SCENE_VERSION`; update the size in the `_Static_assert` (`hc_qmk.c`), `SCENE_BYTES`/offsets in `studio/hc_engine.js`, and offsets in `tools/halo_protocol.py`. The boot guard will reset VIA storage on first boot of the new version; that's expected |
 | The protocol (`hc_protocol.h`, `hc_qmk.c`) | Update `studio/studio_b.js` (`SUB`, `readScene`, `sendDirty`), `tools/halo_protocol.py`, `tools/composer_checks.py` |
-| Key or halo positions | Edit `tools/gen_geometry.py` (`CALIBRATED`, `ABSENT`) and run it (`python tools/gen_geometry.py`). It rewrites `firmware/keymap/composer/hc_board_geometry.c` and `studio/geometry.json`. Then update the points in `firmware/keymap/keymap.c` with the output of `python tools/gen_geometry.py points`. Ring order uses the same math as Studio's *Recompute ring order* |
+| Key or halo positions | Edit `tools/gen_geometry.py` (`CALIBRATED`, with `None` for a halo LED that isn't fitted; `GROUP_RANGES` for the halo areas Studio's quick-selects use) and run it (`python tools/gen_geometry.py`). It rewrites `firmware/keymap/composer/hc_board_geometry.c` and `studio/geometry.json`. Then update the points in `firmware/keymap/keymap.c` with the output of `python tools/gen_geometry.py points`. Ring order uses the same math as Studio's *Recompute ring order* |
 | The ryodeushii base commit | Update `QMK_COMMIT` in `firmware/base.env`, rebuild, and check that `nuphy-shared.diff` still applies and that `side_led_show()` still has the same shape. `keymap.c` carries a copy of `keymaps/default/keymap.c`'s layers: re-copy them if upstream changed. `make_via_json.py` fails if ryodeushii's custom keycode list changed, since `HC_TOGGLE` must be the next one |
 | The RGB-matrix effect list | The static assert in `keymap.c` requires Composer to be mode 43 (its VIA dropdown index). Update `tools/make_via_json.py` together with it |
 | Studio labels used by `scripts/capture_readme_media.js` | Update the capture script, then re-run `capture-media.ps1` |

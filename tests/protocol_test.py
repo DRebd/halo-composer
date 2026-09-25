@@ -85,6 +85,36 @@ def main():
     c.reload()
     check("RELOAD of a bad saved scene never touches VIA keymaps", kb.via_resets() == 2, str(kb.via_resets()))
 
+    # ---- newer flag bits (back and forth, mirrored gradient) pass through untouched and are saved
+    c.defaults()
+    zone = bytearray(c.cmd(hp.GET_ZONE, [2])[:hp.ZONE_BYTES])
+    zone[0] = 7  # Flow
+    zone[hp.ZONE_FLAGS_AT] = hp.ZF_PINGPONG
+    c.cmd(hp.SET_ZONE, [2, *zone])
+    check("SET/GET_ZONE keeps PINGPONG (0x08) on its own", c.cmd(hp.GET_ZONE, [2])[hp.ZONE_FLAGS_AT] == 0x08)
+    zone[hp.ZONE_FLAGS_AT] = hp.ZF_REVERSE | hp.ZF_SRC_SCROLL | hp.ZF_MIRROR | hp.ZF_PINGPONG
+    c.cmd(hp.SET_ZONE, [2, *zone])
+    check("SET/GET_ZONE keeps PINGPONG with REVERSE, SRC_SCROLL and MIRROR (0x0F)",
+          c.cmd(hp.GET_ZONE, [2])[:hp.ZONE_BYTES] == bytes(zone))
+    grads = {1: hp.GF_MIRROR, 3: hp.GF_MIRROR | hp.GF_WRAP}
+    for slot, flags in grads.items():
+        g = bytes([4, flags, 0, 0, 200, 60, 85, 0, 60, 255, 170, 160, 0, 255, 255, 20, 20, 20] + [0] * 8)
+        c.cmd(hp.SET_GRADIENT, [slot, *g])
+        check(f"SET/GET_GRADIENT keeps flags 0x{flags:02X} (MIRROR{'+WRAP' if flags & hp.GF_WRAP else ''})",
+              c.cmd(hp.GET_GRADIENT, [slot])[:hp.GRAD_BYTES] == g)
+    c.save()
+    c.defaults()
+    c.reload()
+    check("PINGPONG zone and MIRROR gradients survive SAVE + RELOAD",
+          c.cmd(hp.GET_ZONE, [2])[hp.ZONE_FLAGS_AT] == 0x0F
+          and all(c.cmd(hp.GET_GRADIENT, [s])[hp.GRAD_FLAGS_AT] == f for s, f in grads.items()))
+    resets = kb.via_resets()
+    kb.reboot()
+    check("...and a reboot: the scene is still valid (no reset) and keeps the bits",
+          kb.via_resets() == resets and c.cmd(hp.GET_ZONE, [2])[hp.ZONE_FLAGS_AT] == 0x0F
+          and all(c.cmd(hp.GET_GRADIENT, [s])[hp.GRAD_FLAGS_AT] == f for s, f in grads.items()),
+          f"resets {resets} -> {kb.via_resets()}")
+
     # ---- checks only the fake can do
     c.defaults()
     check("read_scene() == firmware RAM image", c.read_scene() == kb.scene())

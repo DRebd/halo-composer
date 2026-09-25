@@ -10,11 +10,11 @@ Paths that start with `keyboards/` or `quantum/` are in ryodeushii's firmware at
 |---|---|---|
 | MCU (the keyboard's processor) | STM32F072: Cortex-M0 at 48 MHz, **no floating point, no hardware divide**, 128 KB flash, 16 KB RAM | ryodeushii's tree |
 | LED drivers | 2 × IS31FL3733 (I²C addresses 0x50/0x53 at 1 MHz), 64 RGB LEDs each, 8-bit PWM (brightness levels) | `keyboards/nuphy/halo75v2/ansi/config.h` |
-| LEDs | 0–82 per-key; **83–127 "halo" (45)**: 83–87 status bar, 88–127 underglow ring and badge | `keyboards/nuphy/halo75v2/ansi/side.c` |
-| Halo physical positions | **Measured** on the developer's Halo75 V2 with Studio's calibration wizard and built into the defaults. Halo LEDs 9, 10 and 45 (indices 91, 92, 127) have no LED fitted: Studio hides them and ring order ignores them | `tools/gen_geometry.py` (`CALIBRATED`, `ABSENT`) |
+| LEDs | 0–82 per-key; **83–127 "halo" (45)**: 83–87 status bar, 88–90 a short vertical strip between Fn and ←, 91–127 the light around the edge of the base (front, left, back and right) | `keyboards/nuphy/halo75v2/ansi/side.c`; area names: `tools/gen_geometry.py` (`GROUP_RANGES`) |
+| Halo physical positions | **Measured** on the developer's Halo75 V2 with Studio's calibration wizard, then lined up on the board's straight edges (left x = 7, back y = 9, right x = 217, front y = 62) and built into the defaults. Only the status bar and the strip between Fn and ← sit off those edges. Halo LEDs 9, 10 and 45 (indices 91, 92, 127) have no LED fitted: Studio hides them and ring order ignores them | `tools/gen_geometry.py` (`CALIBRATED`, `ABSENT`) |
 | Frame pacing | QMK RGB matrix: flush every 25 ms (40 fps ceiling), rendering split across main-loop passes (4 LEDs per pass). Measured on the keyboard: 40 fps; about 30 fps with the heaviest reactive scene under 31 simulated key presses per second | `keyboards/nuphy/halo75v2/ansi/keyboard.json` (`led_flush_limit`, `led_process_limit`), `tools/halo_kb.py status` |
 | Raw HID (the USB channel VIA and Studio use) | 32-byte reports, **USB only**. The wireless module carries only keyboard, mouse and media-key reports | `keyboards/nuphy/common/wireless/rf_protocol.h` |
-| Flash use (`.bin` size) | `via` build 74,328 B · `composer` build 83,192 B. About 39 KB of flash stays unused | `dist/` from `scripts/build-firmware.ps1` |
+| Flash use (`.bin` size) | `via` build 74,328 B · `composer` build 83,560 B. About 38 KB of flash stays unused | `dist/` from `scripts/build-firmware.ps1` |
 | RAM | Fixed stacks: 1 KB main + 2 KB process. Free heap (unused headroom): `via` 2,616 B, `composer` 1,496 B. The scene takes 915 B and the engine state about 190 B | `scripts/mem_report.sh` |
 | EEPROM (settings storage) | 4,096 B, emulated in flash. The scene takes 915 B of it, which shrinks VIA's macro space from 2,400 B to 1,485 B. See [Storage](#storage-where-the-scene-lives-and-why-theres-only-one) | `firmware/keymap/config.h` |
 
@@ -47,7 +47,7 @@ flowchart LR
 ### Per-frame pipeline for each LED (`hc_render_led`, integer math only)
 
 1. **Zone lookup.** `zone_of[led] & 7` picks one of 8 zones. Bit 7 means "ignore keypress overlays".
-2. **Base color from the zone's source:** painted per-LED RGB, the zone color, a 1–6 stop gradient sampled along an axis (optionally scrolling), or a rainbow.
+2. **Base color from the zone's source:** painted per-LED RGB, the zone color, a 1–6 stop gradient sampled along an axis (optionally scrolling, one way or back and forth), or a rainbow.
 3. **The effect modulates that color.** Most effects only change brightness between the zone's `v_min` and `v_max`, so painted palettes survive every effect. Hue effects rotate each LED's *own* hue. Sparkle, Raindrops, Ripple and Heatmap blend toward an accent color.
 4. **Keypress overlay** (per zone): flash, glow, ripple, or halo echo.
 5. **Master brightness.** Keys use QMK's global value (Fn+↑/↓). The halo uses NuPhy's halo level (Fn+M+↑/↓, 6 steps), or optionally follows the keys. Optional gamma 2.2, a brightness curve that makes LED values look the way they do on a screen (Studio: *Match screen colors*), which the default look uses.
@@ -55,7 +55,7 @@ flowchart LR
 
 **Design rules:**
 
-- *Effects as modulators* are what make "standard effects while keeping my per-LED colors" possible.
+- *Effects as modulators:* an effect animates the colors it's given (painted per LED, a zone color, a gradient or a rainbow) instead of replacing them. That's what lets painted colors, zone effects and keypress overlays all show at once.
 - *Zones* give per-key effects with different speeds without a RAM-heavy layer stack.
 - Every animation is a **pure function of (scene, time, key hits)**. Random effects hash per-LED time slots instead of storing state. That's what makes the browser preview bit-exact and keeps RAM use small. The only stored state is the 8 most recent key hits and a 128-byte heat map.
 
@@ -110,7 +110,7 @@ The saved scene sits inside VIA's custom-config block, right after NuPhy's 23-by
 | 4 | 384 | `color[128][3]`: painted RGB per LED |
 | 388 | 128 | `zone_of[128]`: bits 0–2 zone, bit 7 = ignore keypress overlays |
 | 516 | 160 | `zones[8]` × 20 B (below) |
-| 676 | 104 | `grad[4]` × 26 B: `count, flags(bit0 wrap), stop[6]{pos,r,g,b}` (stops sorted by pos) |
+| 676 | 104 | `grad[4]` × 26 B: `count, flags, stop[6]{pos,r,g,b}` (stops sorted by pos; flags [below](#zone-and-gradient-flags)) |
 | 780 | 90 | `halo_xy[45][2]`: calibrated positions in QMK's 224×64 space |
 | 870 | 45 | `halo_ring[45]`: position around the ring, 0–255 (drives the Ring axis) |
 
@@ -119,18 +119,40 @@ Zone (20 bytes):
 | Byte | Field | Meaning |
 |---|---|---|
 | 0 | effect | 0–16 (table below) |
-| 1 | speed | 0–255. One cycle ≈ `262144 / (speed + 16)` ms: 16.4 s at 0, 1.8 s at 128, 0.97 s at 255 |
+| 1 | speed | 0–255. One cycle ≈ `262144 / (speed + 16)` ms: 16.4 s at 0, 1.8 s at 128, 0.97 s at 255. Studio's Speed slider moves evenly through this time, not through the byte |
 | 2, 3 | v_min, v_max | brightness floor and ceiling, 0–255 |
 | 4 | axis | 0 X, 1 Y, 2 radial, 3 angle, 4 spiral, 5 diagonal, 6 ring, 7 none |
 | 5 | spread | phase spread across the axis (16 = one full cycle) |
 | 6, 7 | p1, p2 | effect parameters |
-| 8 | flags | bit0 reverse, bit1 also scroll the color source, bit2 mirror the axis |
+| 8 | flags | `HC_ZF_*`, [below](#zone-and-gradient-flags) |
 | 9 | source | 0 painted, 1 zone color, 2 gradient, 3 rainbow |
 | 10, 11 | src_axis, src_scale | axis and scale (16 = once across) for gradient/rainbow |
 | 12 | gradient | slot 0–3 |
 | 13 | reactive | low nibble: 0 none, 1 flash, 2 glow, 3 ripple, 4 halo echo · high nibble: fade 0–15 (overlay lasts `200 + (15 − fade) × 120` ms) |
 | 14–16 | color | zone color (source 1), or accent color (black = the LED's own color) |
 | 17–19 | rx_color | overlay color (black = white) |
+
+### Zone and gradient flags
+
+Zone flags (zone byte 8, `hc_engine.h`):
+
+| Bit | Name | Studio label | Effect |
+|---|---|---|---|
+| 0x01 | `HC_ZF_REVERSE` | Reverse | Runs the effect the other way along its axis, and scrolls colors the other way |
+| 0x02 | `HC_ZF_SRC_SCROLL` | Scroll colors too | Also scrolls the gradient or rainbow along the color axis, one pass per cycle, with any effect |
+| 0x04 | `HC_ZF_MIRROR` | Mirror | Folds the axis at its middle (a fold in *space*), so shapes are symmetric about the center |
+| 0x08 | `HC_ZF_PINGPONG` | Back and forth | A fold in *time*: the phase runs 0→255 in one cycle and 255→0 in the next (a triangle instead of a sawtooth), so one way still takes one cycle. Applies to Wave, White wave, Color cycle, Flow, Comet, Breathe with spread > 0, and to the color scroll of any effect. A comet's tail is the path its head really took, so at a turn it folds in behind the head |
+
+Gradient flags (gradient byte 1):
+
+| Bit | Name | Studio label | Effect |
+|---|---|---|---|
+| 0x01 | `HC_GF_WRAP` | Blend the last color into the first | The space after the last stop blends back into the first stop |
+| 0x02 | `HC_GF_MIRROR` | Loop back through all colors | Sampled as a palindrome: stops G, B, P, K play G→B→P→K→P→B→G across positions 0–255, and positions *p* and 255 − *p* give the same color |
+
+With both gradient flags set, `hc_grad_sample()` folds the position first (mirror), then samples with wrap, so the wrapped loop plays forward and then backward.
+
+**Compatibility.** The firmware stores flag bits exactly as sent and doesn't validate them (`hc_scene_valid()` deliberately skips them). Adding a flag therefore changes neither the scene layout nor `HC_SCENE_VERSION`. Firmware that predates a flag keeps the bit and ignores it, so the effect simply plays without it.
 
 **Default scene** (the factory look, and Studio's starter scene *Warm Desk*), from `hc_scene_defaults()` in `hc_engine.c`:
 
@@ -142,25 +164,27 @@ Changing this layout means bumping `HC_SCENE_VERSION`, updating `SCENE_BYTES` in
 
 ## Effects
 
-| # | Effect | p1 | p2 |
-|---|---|---|---|
-| 0 | Static | – | – |
-| 1 | Breathe (sine between Min and Max; with spread, a traveling wave) | – | – |
-| 2 | Heartbeat | – | – |
-| 3 | Wave (bright band) | band width | – |
-| 4 | White wave | band width | whiteness |
-| 5 | Hue drift | swing | – |
-| 6 | Color cycle | – | – |
-| 7 | Flow (scrolls the gradient/rainbow) | – | – |
-| 8 | Sparkle | density | – |
-| 9 | Candle | – | – |
-| 10 | Raindrops | density | hue shift |
-| 11 | Comet | tail length | count 1–8 |
-| 12 | Strobe | duty | – |
-| 13 | Reactive fade (speed = fade length 0.15–3.2 s) | – | – |
-| 14 | Ripple (rings are round on the real board: rows weighted 1.5×) | ring width | reach in units (12 = one key); 0–1 = whole board |
-| 15 | Heatmap (cools over ~10 s) | – | – |
-| 16 | Off | – | – |
+| # | Effect | p1 | p2 | Back and forth |
+|---|---|---|---|---|
+| 0 | Static | – | – | – |
+| 1 | Breathe (sine between Min and Max; with spread, a traveling wave) | – | – | with spread > 0 |
+| 2 | Heartbeat | – | – | – |
+| 3 | Wave (bright band) | band width | – | yes |
+| 4 | White wave | band width | whiteness | yes |
+| 5 | Hue drift | swing | – | – |
+| 6 | Color cycle | – | – | yes |
+| 7 | Flow (scrolls the gradient/rainbow) | – | – | yes |
+| 8 | Sparkle | density | – | – |
+| 9 | Candle | – | – | – |
+| 10 | Raindrops | density | hue shift | – |
+| 11 | Comet | tail length | count 1–8 | yes: heads bounce, tails fold |
+| 12 | Strobe | duty | – | – |
+| 13 | Reactive fade (speed = fade length 0.15–3.2 s) | – | – | – |
+| 14 | Ripple (rings are round on the real board: rows weighted 1.5×; speed = ring growth, about 5–47 keys/s) | ring width | reach in units (12 = one key); 0–1 = whole board | – |
+| 15 | Heatmap (cools over ~10 s; speed unused) | – | – | – |
+| 16 | Off | – | – | – |
+
+"Back and forth" is `HC_ZF_PINGPONG` (see [the flags](#zone-and-gradient-flags)). On top of the column above, it also applies to the color scroll of any effect that has `HC_ZF_SRC_SCROLL` set.
 
 Together these cover QMK's standard effect families as modulators: breathing and band → Breathe, White wave, Wave; cycles, pinwheel and spiral → Color cycle and Flow with an axis; hue effects → Hue drift; raindrops → Raindrops and Sparkle; reactive → Reactive fade and overlays; splash → Ripple; typing heatmap → Heatmap.
 
@@ -194,8 +218,15 @@ A full scene push is about 40 packets. Studio sends only what changed, 60 ms aft
 - **One HTML file**, assembled by `studio/build_studio.py` from `studio.tpl.html`, `geometry.json`, `hc_engine.js` (the JS twin of `hc_engine.c`) and `studio_a…e.js` (one shared scope). No build tools and no dependencies. The only external request is a Google Fonts stylesheet; without it the page uses fallback system fonts. The same script also writes `halo-studio-preview.html`, a variant for pages that embed Studio in a frame that blocks USB; it can't connect to a keyboard.
 - **Sync:** edits mark LEDs, zones, gradients, geometry and flags as dirty. A serialized `flush()` sends dirty ranges, always reading the *current* scene, and re-marks everything on failure. Save waits for any in-flight sync first. Reads (connect, read, revert, factory) settle the sync before replacing the scene.
 - **Halo geometry is treated as a property of the keyboard**, not of a look. Loading starter scenes, library entries or imports keeps it.
+- **Speed slider:** it moves linearly through cycle time (1,000 steps), and each step is converted to the nearest speed byte. Drawing the slider never rewrites a stored byte; only moving it does. `speedSpec()` in `studio_d.js` gives each effect its own label, readout and note (Ring speed for Ripple, Fade speed for Reactive fade, *not used* for Static, Heatmap and Off).
+- **Hover help:** elements carry a `data-tip`, and one shared tooltip (`#tip`, code in `studio_e.js`) shows it on hover or keyboard focus. Most texts are in the `TIP` table in `studio_a.js`; the ones that depend on the chosen effect (Speed, Min and Max bright, axis, Spread, Back and forth) are built in `studio_d.js`.
 - **Storage:** autosave plus "My scenes" in the browser's `localStorage`, which is per browser and per web address (so a copy of Studio at another address has its own library). Studio also keeps the 5 newest automatic backups it makes when connecting or reading the keyboard. Export/import uses `.halo.json` files: `{"format": "halo-studio-scene", "version": 1, "name", "created", "zoneNames", "scene": <base64 of the 915 bytes>}`. `tools/halo_kb.py scene-backup`/`scene-restore` use the same format.
 
 ## Parity: why the preview matches the keyboard
 
-`hc_engine.c` and `studio/hc_engine.js` are written line by line to produce identical integers. That covers FastLED-style `sin8`, integer HSV, an octant `atan2`, integer square root, and C-style truncating division in JS. `tests/host_vectors.c` renders 80 fuzzed scenes × 40 frames (all effects, sources, axes, overlays, flags, 0–6 stop gradients, off-grid halo positions, timer wrap) and `tests/parity_test.mjs` replays them in JS, requiring **byte-identical** frames. **Any change to the engine math must be made in both files.**
+`hc_engine.c` and `studio/hc_engine.js` are written line by line to produce identical integers. That covers FastLED-style `sin8`, integer HSV, an octant `atan2`, integer square root, and C-style truncating division in JS. `tests/host_vectors.c` renders 88 scenes × 40 frames and `tests/parity_test.mjs` replays them in JS, requiring **byte-identical** frames:
+
+- 80 fuzzed scenes: all effects, sources, axes, overlays, all four zone flags and both gradient flags, 0–6 stop gradients, off-grid halo positions, timer wrap;
+- 8 fixed scenes whose frames straddle the turns of Back and forth, on every effect it applies to (and two it must leave alone), combined with Reverse, Mirror and Scroll colors too, over mirrored gradients.
+
+`host_vectors.c` also runs behavior checks on the C engine: a mirrored gradient is a palindrome; Back and forth has no jump at either turn, and its way back retraces the way out (for a comet, it matches the reversed comet); effects it doesn't apply to are unchanged. `parity_test.mjs` checks the palindrome in JS too. **Any change to the engine math must be made in both files.**

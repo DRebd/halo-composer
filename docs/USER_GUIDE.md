@@ -8,7 +8,13 @@ Studio talks to the keyboard over the USB cable using **WebHID**, the Chrome and
 
 You can design without a keyboard. The animated preview uses the same lighting math as the firmware, so what you see is what the keyboard will show. The preview also shows LED colors the way the eye sees them: an LED's light rises in step with its value, but a screen's doesn't, so Studio converts each value before drawing it. Whites and dim colors therefore look on screen roughly as they do on the keys. Screens and LEDs still differ, so treat the preview as close rather than exact.
 
-A **scene** is everything about a look: the color of every LED, the zones and their effects, the gradients, and the halo layout.
+A **scene** is everything about a look, and its parts all work at the same time:
+
+- a painted color for every LED, keys and halo alike;
+- up to 8 **zones**, each running its own effect, speed and brightness range over those colors, or over a gradient or rainbow;
+- **keypress reactions** on top: flash, glow, ripple, or an echo on the halo.
+
+A scene also holds the 4 gradients and the halo layout.
 
 ## Quick start: the factory look
 
@@ -38,15 +44,18 @@ The pill at the top shows the state: *Preview only* (not connected), *Connected 
 
 ## The screen
 
+**Hover help.** Rest the pointer on a label with a dotted underline, or on most buttons, and a short explanation appears. The same help shows when you reach a control with the Tab key. Some of it follows your choices: for example, the help for *Min bright* says what it does in the zone's current effect.
+
 **Left: the keyboard preview.**
 
+- **The drawing:** each key shows its LED's color, with its label in dark text on a white glow so it reads on any color. The halo LEDs are the dots around the edge, all the same size except the 5 smaller status-bar LEDs at the back left.
 - **Tool:**
   - *Select*: click an LED or drag a box. **Shift** adds to the selection, **Alt** removes, **Ctrl** (Cmd on a Mac) toggles.
   - *Paint*: click or drag to brush the current color onto LEDs.
   - *Eyedropper*: click an LED to pick up its color. Studio then switches to Paint.
   - *Type (test reactive)*: click keys, or type on your real keyboard, to try keypress reactions. When connected with Composer on, the keyboard reacts too.
-- **Show:** *Live* (animated), *Base colors* (the stored colors without effects), or *Zones* (a zone number on every LED).
-- **Select buttons:** All, Keys, Halo, WASD, Arrows, Letters, Home row, Numbers, F-row, Mods, Nav, Status bar, Badge, Halo front, Halo back, Halo sides, Invert, None. Shift-click a button to add to the selection, Alt-click to remove. **Ctrl+A** (Cmd+A) selects everything; **Esc** clears the selection.
+- **Show:** *Live* (animated), *Base colors* (the stored colors without effects), or *Zones* (each LED's zone number in white: at the bottom of each key, and inside each halo dot).
+- **Select buttons:** All, Keys, Halo, WASD, Arrows, Letters, Home row, Numbers, F-row, Mods, Nav, Status bar, Halo front, Halo back, Halo sides, Invert, None. *Halo front* includes the short 3-LED strip between the Fn and ← keys. Shift-click a button to add to the selection, Alt-click to remove. **Ctrl+A** (Cmd+A) selects everything; **Esc** clears the selection.
 - **Preview row:** *Animate* pauses or plays the animation. *Simulated typing* fakes keypresses in the preview. The *Key brightness* and *Halo level (Fn+M+↑/↓)* sliders mimic the keyboard's brightness keys. These only affect the preview.
 
 **Right: the tabs.** Paint, Zones, Gradients, Effects, Scenes, Halo setup and Device, each described below.
@@ -64,7 +73,7 @@ Painted colors show on any LED whose zone uses *Painted colors* as its source. E
 
 Every LED belongs to one of 8 zones, and each zone has its own effect, speed, brightness range and colors. In the factory look, all keys are in zone 1 (*Keys*), the halo is in zone 3 (*Halo*), and zone 2 is empty. Some starter scenes use zone 2 for WASD.
 
-**Zone cards.** The tab opens with one card per zone. Each card shows the zone's number on its color tag (the same color the *Zones* view uses), its name, how many LEDs it holds (or *empty*), and its effect and color source. Click a card to edit that zone.
+**Zone cards.** The tab opens with one card per zone. Each card shows the zone's number, its name, how many LEDs it holds (or *empty*), and its effect and color source. Click a card to edit that zone.
 
 Under the cards:
 
@@ -77,16 +86,29 @@ Each zone has these settings:
 |---|---|
 | **Name** | A label for the card, up to 18 characters. Names are kept by Studio and in exported scene files, not on the keyboard. |
 | **Effect** | The animation (see [Effects](#effects)). A short description appears under it. |
-| **Speed** | Shown as seconds per cycle, from about 16 s (slowest) to about 1 s (fastest). |
-| **Min bright / Max bright** | How dark and how bright the effect goes. *Breathe* at Min 50% / Max 100% never goes fully dark. |
-| **Extra sliders** | Some effects add one or two, such as Ripple's *Ring width* and *Reach* (see the [Effects](#effects) table). |
+| **Speed** | How fast the effect runs; further right is faster. The readout shows the real time of one cycle, from 16.4 s at the far left to under 1 s at the far right, and the slider moves evenly through that time. Near the slow end it jumps in bigger steps, because the keyboard stores Speed as a single number from 0 to 255. A note under the slider says what the time means for the current effect, such as "One breath takes 4.68 s". See [What Speed means](#what-speed-means) for the effects that use it differently. |
+| **Min bright / Max bright** | How dark and how bright the effect goes. *Breathe* at Min 50% / Max 100% never goes fully dark. Hover help says what each one does in the current effect. |
+| **Extra sliders** | Some effects add one or two, such as Ripple's *Ring width* and *Reach* (see the [Effects](#effects) table). Each shows its value in a unit: a percentage, degrees around the color wheel, keys, or a count. |
 | **Effect axis + Spread** | The direction of travel, and how much of a cycle is spread across it. Axes: Left → right, Back → front, Center → out, Around center, Spiral, Diagonal, Ring (halo order), or None (in sync). |
-| **Reverse / Mirror / Scroll colors too** | Run backwards; fold the pattern at the middle so it runs out from (or into) the center; also slide the gradient or rainbow colors at the effect's speed. |
+| **Reverse / Mirror / Back and forth / Scroll colors too** | *Reverse* runs the motion the other way. *Mirror* folds the pattern at the middle so it runs out from (or into) the center. *Back and forth* runs the motion forward, then backward (see below). *Scroll colors too* also slides the gradient or rainbow colors, one pass per cycle. |
 | **Source** | Where the colors come from: *Painted colors (per LED)*, *Zone color*, *Gradient* (pick one of the 4 slots), or *Rainbow*. For Gradient and Rainbow, *Color axis* sets the direction and *Color scale* stretches or squeezes the colors. |
-| **Zone color / Accent color** | With Source set to *Zone color*, this is the zone's single color. Otherwise it's the accent color that Sparkle, Raindrops, Ripple and Heatmap use. Black means "use each LED's own color"; Raindrops then shifts hue instead. |
-| **Keypress overlay** | A reaction on top of the effect: *None*, *Flash*, *Glow*, *Ripple* (a ring rolls out from the key into the halo), or *Halo echo* (lights the halo LEDs nearest the pressed key; use it on halo zones). *Fade* sets how long it lasts, from 0.2 s to 2 s. *Reaction color* picks its color (black means white). |
+| **Zone color / Accent color** | With Source set to *Zone color*, this is the zone's single color. Otherwise it's the accent color that Sparkle, Raindrops, Ripple and Heatmap use (other effects mark it *not used*). Black means "use each LED's own color"; Raindrops then shifts hue instead. |
+| **Keypress overlay** | A reaction on top of any effect: *None*, *Flash* (the pressed key flashes), *Glow* (the keys around it light up, fading with distance), *Ripple* (a ring spreads out across this zone's LEDs; give the halo's zone a Ripple too to carry it into the halo), or *Halo echo* (the halo LEDs in the pressed key's direction, seen from the keyboard's center, light up; only halo LEDs react, so use it on halo zones). *Fade* sets how long it lasts, from 2 s at the far left to 0.2 s at the far right. *Reaction color* picks its color (black means white). |
 
 Tip: switch the Tool to *Type (test reactive)* and click keys to try reactions.
+
+**Back and forth.** Normally a moving effect jumps back to the start at the end of each cycle. With *Back and forth* on, the motion runs forward for one cycle, then backward for the next, at the same pace: one way takes one cycle, there and back takes two. It works with Wave, White wave, Color cycle, Flow and Comet, with Breathe when Spread is above 0, and on the color scroll of any effect when *Scroll colors too* is on. Comets bounce at the ends, and each tail folds in behind its head at the turn. Where it has nothing to act on, the checkbox is grayed out.
+
+#### What Speed means
+
+For most effects, Speed is the time of one cycle: one breath, one sweep of the band, one trip around the color wheel. With *Back and forth* on, the note gives both the one-way time and the there-and-back time. A few effects use Speed differently, and the slider's label and readout change to match:
+
+| Effect | The slider shows |
+|---|---|
+| Ripple | **Ring speed**: how fast rings spread, from about 5 keys per second (far left) to about 47 (far right) |
+| Reactive fade | **Fade speed**: how long a pressed key takes to fade back to Min, from 3.21 s (far left) to 150 ms (far right) |
+| Sparkle, Raindrops, Candle | How long each sparkle or drop lasts, or how often each LED's flicker changes brightness |
+| Static, Heatmap, Off | *not used*, and the slider is grayed out. With *Scroll colors too* on, Static and Heatmap use it for the scroll speed |
 
 ### Effects
 
@@ -105,18 +127,25 @@ Every effect animates *your* colors instead of replacing them. The Effects tab s
 | Sparkle | Random LEDs flash to the accent color, then fade back to the Min glow | Density |
 | Candle | Each LED flickers smoothly and independently between Min and Max, like a flame | |
 | Raindrops | Random LEDs slowly fade to the accent color and back | Density, Hue shift |
-| Comet | Bright heads with fading tails. Use the Ring axis to orbit the halo | Tail length, Comets (1–8) |
+| Comet | Bright heads with fading tails. Use the Ring axis to orbit the halo. With Back and forth, they bounce between the ends of the axis | Tail length, Comets (1–8) |
 | Strobe | Hard blink between Max and Min. Good for alerts, not all-day use | On time (duty) |
-| Reactive fade | Sits at Min until you press a key; that key jumps to Max and fades. Speed sets how long the fade lasts | |
-| Ripple | Each keypress sends out a ring of the accent color. Min bright is the resting brightness, Max bright the ring. **Reach** sets how far rings travel before fading, shown in keys; slide it fully left for the whole board. Rings reach halo LEDs only if they're in the same zone | Ring width, Reach |
-| Heatmap | Keys you use a lot drift toward the accent color and cool down over about 10 seconds | |
+| Reactive fade | Sits at Min until you press a key; that key jumps to Max and fades. Speed (shown as *Fade speed*) sets how long the fade lasts | |
+| Ripple | Each keypress sends out a ring of the accent color. Min bright is the resting brightness, Max bright the ring. **Reach** sets how far rings travel before fading, shown in keys; slide it fully left for the whole board. Speed (shown as *Ring speed*) sets how fast rings spread. Rings reach halo LEDs only if they're in the same zone | Ring width, Reach |
+| Heatmap | Keys you use a lot drift toward the accent color and cool down over about 10 seconds. Speed isn't used | |
 | Off | The zone stays dark | |
 
 The factory look uses the *Ripple effect* on the keys (Reach 2 keys, mint accent) together with a *Flash* keypress overlay.
 
 ### Gradients
 
-There are 4 gradient slots, each with up to 6 color stops. Pick a slot, then for each stop set its color and drag its position slider, or remove it with **×**. **Add stop**, **Loop back to the first color** and **Reverse** change the whole gradient. **Load a preset…** offers 12: Sunset, Aurora, Ember, Ocean, Warm glow, Fire, Vaporwave, Candy, Forest, Ice, Spectrum and Mono amber.
+There are 4 gradient slots, each with up to 6 color stops. Pick a slot, then for each stop set its color and drag its position slider, or remove it with **×**. **Add stop** adds a stop after the last one, and **Reverse** flips the gradient end to end. **Load a preset…** offers 12: Sunset, Aurora, Ember, Ocean, Warm glow, Fire, Vaporwave, Candy, Forest, Ice, Spectrum and Mono amber.
+
+Two checkboxes change how the gradient ends:
+
+- **Loop back through all colors** plays the stops forward, then back again, so the gradient ends on the color it started with. Stops green, blue, purple, pink play green → blue → purple → pink → purple → blue → green. A gradient that scrolls, or runs around the halo, then has no visible seam.
+- **Blend the last color into the first** fills the space after the last stop with a blend back to the first color, so a scrolling gradient loops without a jump. Leave some room after the last stop for the blend.
+
+With both on, the blended loop plays forward, then backward.
 
 A zone uses a gradient when its Source is *Gradient*. The *Flow* effect makes it glide.
 
@@ -129,7 +158,7 @@ A zone uses a gradient when its Source is *Gradient*. The *Flow* effect makes it
 
 ### Halo setup (calibration)
 
-NuPhy doesn't publish where the halo LEDs sit. Studio has a built-in layout, measured on a Halo75 V2, which should fit yours. You only need this tab if waves, comets or ripples don't line up with the halo.
+NuPhy doesn't publish where the halo LEDs sit. Studio has a built-in layout, measured on a Halo75 V2 and then lined up along the board's straight edges, which should fit yours. You only need this tab if waves, comets or ripples don't line up with the halo.
 
 The top of the tab says which layout the editor is using:
 
@@ -141,7 +170,7 @@ Of the 45 halo positions, numbers 9, 10 and 45 have no LED fitted, so Studio hid
 To calibrate:
 
 1. Connect the keyboard. Composer has to be the running effect; if it isn't, press **Fn+Enter**.
-2. Click **Start placing**. The keyboard goes dark except for one amber halo LED. Click where that LED is on the drawing, and the next one lights up automatically. Click **Skip / next** for any you can't see, or **Prev** to go back. After the last LED, Studio works out the ring order from your positions.
+2. Click **Start placing**. The keyboard goes dark except for one amber halo LED. Click where that LED is on the drawing, and the next one lights up automatically. The tab shows the LED's number, its area (Status bar, Strip between Fn and ←, Front edge, Left side, Back edge or Right side) and its position. Click **Skip / next** for any you can't see, or **Prev** to go back. After the last LED, Studio works out the ring order from your positions.
 3. Click **Walk the ring**. It lights the halo one LED at a time in ring order, on the keyboard and in the preview. Check that it goes smoothly around. Comets and the Ring axis follow this order. **Recompute ring order** rebuilds the order from the positions.
 4. Click **Save to keyboard.**
 
