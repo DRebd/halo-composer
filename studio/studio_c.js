@@ -2,49 +2,71 @@
 // ----------------------------------------------------------------- canvas
 const cv = $('#kb'), ctx = cv.getContext('2d');
 const ZONE_TINTS = ['#ffab3d', '#45d3c4', '#ff6bb5', '#8f8bff', '#9be15d', '#ffd84a', '#5ab1ff', '#ff7a59'];
+// Case drawn roughly to scale: bezel one key wide at the back, half a key on the
+// sides and front. Key block = 16 x 6 key units (U) starting at (OX, OY).
+const BEZEL = { top: 1.0, side: 0.5, bottom: 0.5 };
 let U = 60, OX = 60, OY = 60;
 function layout() {
   const dpr = window.devicePixelRatio || 1;
   const w = cv.clientWidth || 1000;
-  U = w / 19.0; OX = 1.5 * U; OY = 1.65 * U;
-  const h = Math.round(U * 8.3);
+  U = w / (16 + 2 * BEZEL.side + 0.4); OX = (BEZEL.side + 0.2) * U; OY = (BEZEL.top + 0.2) * U;
+  const h = Math.round(U * (6 + BEZEL.top + BEZEL.bottom + 0.4));
   cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.height = h + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
-// engine coordinates -> canvas
-const haloPos = (i) => { const s = state.scene; const x = s.haloXY[i * 2], y = s.haloXY[i * 2 + 1]; return [OX + ((x - 16) / 12) * U, OY + ((y - 12) / 8) * U]; };
-const toEngine = (cx, cy) => [clamp(Math.round(16 + ((cx - OX) / U) * 12), 0, 255), clamp(Math.round(12 + ((cy - OY) / U) * 8), 0, 255)];
+// Engine coordinates (x 0..224, y 0..64) -> key units. Keys span x 16..208 (12 per
+// U) and y 12..60 (8 per U); the margins outside that map onto the drawn bezel.
+function engUnits(x, y) {
+  const ux = x < 16 ? -BEZEL.side * (16 - x) / 16 : x > 208 ? 16 + BEZEL.side * (x - 208) / 16 : (x - 16) / 12;
+  const uy = y < 12 ? -BEZEL.top * (12 - y) / 12 : y > 60 ? 6 + BEZEL.bottom * (y - 60) / 4 : (y - 12) / 8;
+  return [ux, uy];
+}
+function unitsEng(ux, uy) {
+  const x = ux < 0 ? 16 + (ux / BEZEL.side) * 16 : ux > 16 ? 208 + ((ux - 16) / BEZEL.side) * 16 : 16 + ux * 12;
+  const y = uy < 0 ? 12 + (uy / BEZEL.top) * 12 : uy > 6 ? 60 + ((uy - 6) / BEZEL.bottom) * 4 : 12 + uy * 8;
+  return [x, y];
+}
+const haloPos = (i) => { const s = state.scene; const [ux, uy] = engUnits(s.haloXY[i * 2], s.haloXY[i * 2 + 1]); return [OX + ux * U, OY + uy * U]; };
+const toEngine = (cx, cy) => unitsEng((cx - OX) / U, (cy - OY) / U).map((v) => clamp(Math.round(v), 0, 255));
+// LEDs emit light linearly, screens don't: show LED values as the eye sees them.
+const DISP = Uint8Array.from({ length: 256 }, (_, v) => Math.round(255 * Math.pow(v / 255, 1 / 2.2)));
+const disp = (c) => [DISP[c[0]], DISP[c[1]], DISP[c[2]]];
 function keyRect(k) { const p = U * 0.06; return [OX + k.x * U + p, OY + k.y * U + p, k.w * U - 2 * p, U - 2 * p]; }
 function ledCenter(led) { if (led < KEY_LEDS) { const r = keyRect(KEYS[led]); return [r[0] + r[2] / 2, r[1] + r[3] / 2]; } return haloPos(led - KEY_LEDS); }
 function hitTest(x, y) {
-  for (let i = 0; i < HALO_LEDS; i++) { const [hx, hy] = haloPos(i); if ((x - hx) ** 2 + (y - hy) ** 2 < (U * 0.32) ** 2) return KEY_LEDS + i; }
+  for (let i = 0; i < HALO_LEDS; i++) { if (ABSENT.has(KEY_LEDS + i)) continue; const [hx, hy] = haloPos(i); if ((x - hx) ** 2 + (y - hy) ** 2 < (U * 0.22) ** 2) return KEY_LEDS + i; }
   for (const k of KEYS) { const r = keyRect(k); if (x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3]) return k.led; }
   return -1;
 }
 function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 function ledColor(led) {
-  if (state.view === 'base') { const s = state.scene; const z = s.zones[s.zoneOf[led] & 7]; const c = [s.color[led * 3], s.color[led * 3 + 1], s.color[led * 3 + 2]]; return z.source === SRC.ZONE ? z.color : c; }
-  return [frame[led * 3], frame[led * 3 + 1], frame[led * 3 + 2]];
+  if (state.view === 'base') {
+    // Stored colours are screen colours when the scene uses perceptual gamma, raw LED values otherwise.
+    const s = state.scene; const z = s.zones[s.zoneOf[led] & 7]; const c = z.source === SRC.ZONE ? z.color : [s.color[led * 3], s.color[led * 3 + 1], s.color[led * 3 + 2]];
+    return (s.flags & SF.GAMMA) ? c : disp(c);
+  }
+  return disp([frame[led * 3], frame[led * 3 + 1], frame[led * 3 + 2]]);
 }
 let marquee = null;
 function draw() {
   const W = cv.clientWidth, H = parseFloat(cv.style.height);
   ctx.clearRect(0, 0, W, H);
   // case
-  const cx0 = OX - 1.35 * U, cy0 = OY - 1.5 * U, cw = 18.7 * U, ch = 8.05 * U;
+  const cx0 = OX - BEZEL.side * U, cy0 = OY - BEZEL.top * U, cw = (16 + 2 * BEZEL.side) * U, ch = (6 + BEZEL.top + BEZEL.bottom) * U;
   const g = ctx.createLinearGradient(0, cy0, 0, cy0 + ch); g.addColorStop(0, '#23262e'); g.addColorStop(1, '#16181d');
-  roundRect(cx0, cy0, cw, ch, U * 0.45); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = '#30343d'; ctx.lineWidth = 1.5; ctx.stroke();
+  roundRect(cx0, cy0, cw, ch, U * 0.3); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = '#30343d'; ctx.lineWidth = 1.5; ctx.stroke();
   roundRect(OX - 0.12 * U, OY - 0.12 * U, 16.24 * U, 6.24 * U, U * 0.18); ctx.fillStyle = '#0c0d10'; ctx.fill();
   // halo LEDs (glow)
   for (let i = 0; i < HALO_LEDS; i++) {
+    if (ABSENT.has(KEY_LEDS + i)) continue;
     const led = KEY_LEDS + i, [x, y] = haloPos(i), c = ledColor(led), lum = Math.max(c[0], c[1], c[2]);
     const grp = GEOM.halo[i].group, small = grp === 'status' || grp === 'badge';
-    if (lum > 4) { const rg = ctx.createRadialGradient(x, y, 0, x, y, U * (small ? 0.45 : 0.75)); rg.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},${0.55 * lum / 255})`); rg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = rg; ctx.fillRect(x - U, y - U, 2 * U, 2 * U); }
-    ctx.beginPath(); ctx.arc(x, y, U * (small ? 0.12 : 0.16), 0, Math.PI * 2);
+    if (lum > 4) { const rg = ctx.createRadialGradient(x, y, 0, x, y, U * (small ? 0.35 : 0.55)); rg.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},${0.55 * lum / 255})`); rg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = rg; ctx.fillRect(x - U, y - U, 2 * U, 2 * U); }
+    ctx.beginPath(); ctx.arc(x, y, U * (small ? 0.09 : 0.13), 0, Math.PI * 2);
     ctx.fillStyle = lum > 4 ? `rgb(${c[0]},${c[1]},${c[2]})` : '#2a2d34'; ctx.fill();
     if (state.sel.has(led)) { ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke(); }
-    if (state.view === 'zones') drawZoneTag(led, x + U * 0.2, y - U * 0.2, 0.28);
-    if (state.tab === 'halo' && state.calib.idx === i) { ctx.beginPath(); ctx.arc(x, y, U * 0.34, 0, Math.PI * 2); ctx.strokeStyle = '#ffab3d'; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]); }
+    if (state.view === 'zones') drawZoneTag(led, x + U * 0.16, y - U * 0.16, 0.24);
+    if (state.tab === 'halo' && state.calib.idx === i) { ctx.beginPath(); ctx.arc(x, y, U * 0.26, 0, Math.PI * 2); ctx.strokeStyle = '#ffab3d'; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]); }
   }
   // keys
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -114,7 +136,7 @@ cv.addEventListener('pointermove', (e) => {
 });
 cv.addEventListener('pointerup', () => {
   if (drag?.kind === 'box' && marquee) {
-    const inside = []; for (let l = 0; l < LED_COUNT; l++) { const [x, y] = ledCenter(l); if (x >= marquee.x && x <= marquee.x + marquee.w && y >= marquee.y && y <= marquee.y + marquee.h) inside.push(l); }
+    const inside = []; for (let l = 0; l < LED_COUNT; l++) { if (ABSENT.has(l)) continue; const [x, y] = ledCenter(l); if (x >= marquee.x && x <= marquee.x + marquee.w && y >= marquee.y && y <= marquee.y + marquee.h) inside.push(l); }
     setSel(inside, drag.mode);
   } else if (drag?.kind === 'box') setSel([], drag.mode === 'replace' ? 'replace' : 'add');
   if (drag?.kind === 'place') advanceCalib();

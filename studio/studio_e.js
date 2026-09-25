@@ -9,19 +9,23 @@ function placeHalo(x, y) {
   const [ex, ey] = toEngine(x, y), i = state.calib.idx, s = state.scene;
   s.haloXY[i * 2] = ex; s.haloXY[i * 2 + 1] = ey; markGeom();
 }
+// Next/previous halo LED that is actually fitted (0-based halo number).
+const fittedHalo = (i, step) => { do { i += step; } while (i >= 0 && i < HALO_LEDS && ABSENT.has(KEY_LEDS + i)); return i; };
 function advanceCalib() {
   const c = state.calib;
-  if (!c.placing) { c.idx = (c.idx + 1) % HALO_LEDS; renderTab(); return; }
-  c.idx++;
+  if (!c.placing) { c.idx = fittedHalo(c.idx, 1); if (c.idx >= HALO_LEDS) c.idx = fittedHalo(-1, 1); renderTab(); return; }
+  c.idx = fittedHalo(c.idx, 1);
   if (c.idx >= HALO_LEDS) { c.idx = HALO_LEDS - 1; c.placing = false; identify(-1); recomputeRing(); toast('Calibration done. Ring order recomputed from your positions. Press Save to keep it on the keyboard.'); }
   else identify(c.idx);
   renderTab();
 }
 function stopWalk() { if (walkTimer) { clearInterval(walkTimer); walkTimer = null; } }
 function recomputeRing() {
+  // Same maths as ring_from_xy() in tools/gen_geometry.py. Unfitted LEDs don't stretch the outline.
   const s = state.scene, xs = [], ys = [];
   for (let i = 0; i < HALO_LEDS; i++) { xs.push(s.haloXY[i * 2]); ys.push(s.haloXY[i * 2 + 1]); }
-  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const live = range(0, HALO_LEDS - 1).filter((i) => !ABSENT.has(KEY_LEDS + i)), lx = live.map((i) => xs[i]), ly = live.map((i) => ys[i]);
+  const x0 = Math.min(...lx), x1 = Math.max(...lx), y0 = Math.min(...ly), y1 = Math.max(...ly);
   const w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0), P = 2 * (w + h), cy = (y0 + y1) / 2;
   for (let i = 0; i < HALO_LEDS; i++) {
     const x = xs[i], y = ys[i], d = [x1 - x, y1 - y, x - x0, y - y0]; // right, bottom, left, top
@@ -39,7 +43,7 @@ let walkTimer = null;
 function walkRing() {
   stopWalk();
   if (state.calib.placing) { state.calib.placing = false; renderTab(); }
-  const order = range(0, HALO_LEDS - 1).sort((a, b) => state.scene.haloRing[a] - state.scene.haloRing[b]);
+  const order = range(0, HALO_LEDS - 1).filter((i) => !ABSENT.has(KEY_LEDS + i)).sort((a, b) => state.scene.haloRing[a] - state.scene.haloRing[b]);
   let k = 0;
   walkTimer = setInterval(() => {
     if (k >= order.length) { stopWalk(); identify(-1); state.calib.idx = 0; renderTab(); return; }
@@ -49,16 +53,16 @@ function walkRing() {
 function tabHalo(body) {
   const c = state.calib, g = GEOM.halo[c.idx];
   body.append(
-    el('div', { class: 'banner' }, el('b', {}, 'Why calibrate? '), 'NuPhy doesn\'t publish where each of the 45 halo LEDs sits. The starting layout is inferred from their firmware and may be wrong. Five minutes here makes waves, comets and ripples line up with your real keyboard.'),
+    el('div', { class: 'banner' }, el('b', {}, 'Why calibrate? '), 'NuPhy doesn\'t publish where the halo LEDs sit. The built-in layout was measured on one Halo75 V2 and should fit yours; recalibrate if waves, comets or ripples don\'t line up. LEDs 9, 10 and 45 have no LED fitted, so they are hidden and skipped.'),
     el('div', { class: 'sec' }, el('h3', {}, 'Place each halo LED'),
       el('ol', { class: 'hint', style: 'margin:0;padding-left:18px' },
-        el('li', {}, 'Connect the keyboard and switch Composer on (Device tab). The keyboard goes dark except one amber halo LED.'),
-        el('li', {}, 'Click where that LED is on the diagram. The next one lights up automatically.'),
+        el('li', {}, 'Connect the keyboard (button at the top right). Composer has to be the running effect: it is unless you changed effects with Fn+←. If not, press Fn+Enter on the keyboard.'),
+        el('li', {}, 'Press Start placing. The keyboard goes dark except one amber halo LED. Click where that LED is on the drawing; the next one lights up automatically.'),
         el('li', {}, 'Can\'t see it? Press Skip. Without a keyboard you can still drag LEDs around by hand.')),
-      el('div', { class: 'kv' }, el('span', {}, 'LED'), el('span', {}, `${c.idx + 1} of ${HALO_LEDS} (index ${KEY_LEDS + c.idx})`), el('span', {}, 'Guessed spot'), el('span', {}, g.group), el('span', {}, 'Position'), el('span', {}, `${state.scene.haloXY[c.idx * 2]}, ${state.scene.haloXY[c.idx * 2 + 1]}`)),
+      el('div', { class: 'kv' }, el('span', {}, 'LED'), el('span', {}, `${c.idx + 1} of ${HALO_LEDS} (index ${KEY_LEDS + c.idx})`), el('span', {}, 'Area'), el('span', {}, g.group), el('span', {}, 'Position'), el('span', {}, `${state.scene.haloXY[c.idx * 2]}, ${state.scene.haloXY[c.idx * 2 + 1]}`)),
       el('div', { class: 'row' },
-        el('button', { class: 'btn primary' + (c.placing ? ' active' : ''), onclick: () => { stopWalk(); c.placing = !c.placing; identify(c.placing ? c.idx : -1); renderTab(); } }, c.placing ? 'Stop placing' : (c.idx ? 'Resume placing' : 'Start placing')),
-        el('button', { class: 'btn', onclick: () => { c.idx = (c.idx + HALO_LEDS - 1) % HALO_LEDS; identify(c.placing ? c.idx : -1); renderTab(); } }, 'Prev'),
+        el('button', { class: 'btn primary' + (c.placing ? ' active' : ''), onclick: () => { stopWalk(); if (ABSENT.has(KEY_LEDS + c.idx)) c.idx = fittedHalo(c.idx, 1) % HALO_LEDS; c.placing = !c.placing; identify(c.placing ? c.idx : -1); renderTab(); } }, c.placing ? 'Stop placing' : (c.idx ? 'Resume placing' : 'Start placing')),
+        el('button', { class: 'btn', onclick: () => { c.idx = fittedHalo(c.idx, -1); if (c.idx < 0) c.idx = fittedHalo(HALO_LEDS, -1); identify(c.placing ? c.idx : -1); renderTab(); } }, 'Prev'),
         el('button', { class: 'btn', onclick: () => advanceCalib() }, 'Skip / next'))),
     el('div', { class: 'sec' }, el('h3', {}, 'Check the order'),
       el('div', { class: 'row' },
@@ -86,7 +90,7 @@ function tabDevice(body) {
         el('button', { class: 'btn', onclick: () => { markAll(); flush().then(() => toast('Editor pushed to the keyboard (RAM). Save to keep it.')).catch(fail('Pushing')); } }, 'Push editor to keyboard'),
         el('button', { class: 'btn ghost', onclick: () => factoryScene().catch(fail('Loading the factory scene')) }, 'Factory scene')) : null),
     el('div', { class: 'sec' }, el('h3', {}, 'Scene options'),
-      check('Perceptual brightness (gamma 2.2)', !!(s.flags & SF.GAMMA), (on) => { s.flags = on ? s.flags | SF.GAMMA : s.flags & ~SF.GAMMA; markFlags(); }, 'Makes low brightness steps look even; dims mid tones'),
+      check('Match screen colors (perceptual brightness)', !!(s.flags & SF.GAMMA), (on) => { s.flags = on ? s.flags | SF.GAMMA : s.flags & ~SF.GAMMA; markFlags(); }, 'On: colors and brightness levels look on the keys the way they look on screen (the factory look uses this). Off: raw LED values, which look whiter and brighter than on screen.'),
       check('Halo follows key brightness (Fn+↑/↓) instead of Fn+M+↑/↓', !!(s.flags & SF.HALO_FOLLOWS_KEYS), (on) => { s.flags = on ? s.flags | SF.HALO_FOLLOWS_KEYS : s.flags & ~SF.HALO_FOLLOWS_KEYS; markFlags(); })),
     L ? el('div', { class: 'sec' }, el('h3', {}, 'Diagnostics'), el('div', { class: 'row' }, el('button', { class: 'btn small', onclick: stats }, 'Measure keyboard frame rate'), el('span', { id: 'statOut', class: 'mono muted' }))) : null,
     el('div', { class: 'sec' }, el('h3', {}, 'HID log'), el('div', { class: 'log', id: 'hidlog' }, logLines.join('\n') || '—')),
@@ -113,7 +117,7 @@ function init() {
   restoreLocal();
   const qs = $('#quickSel');
   for (const name of Object.keys(GROUPS)) qs.append(el('button', { class: 'btn small', onclick: (e) => setSel(GROUPS[name], e.shiftKey ? 'add' : e.altKey ? 'remove' : 'replace') }, name));
-  qs.append(el('button', { class: 'btn small', onclick: () => setSel(range(0, 127).filter((l) => !state.sel.has(l))) }, 'Invert'), el('button', { class: 'btn small', onclick: () => setSel([]) }, 'None'));
+  qs.append(el('button', { class: 'btn small', onclick: () => setSel(GROUPS['All'].filter((l) => !state.sel.has(l))) }, 'Invert'), el('button', { class: 'btn small', onclick: () => setSel([]) }, 'None'));
   for (const b of document.querySelectorAll('#toolSeg button')) b.addEventListener('click', () => setTool(b.dataset.tool));
   for (const b of document.querySelectorAll('#viewSeg button')) b.addEventListener('click', () => { state.view = b.dataset.view; syncViewSeg(); });
   for (const b of document.querySelectorAll('#tabs button')) b.addEventListener('click', () => { state.tab = b.dataset.tab; if (state.tab !== 'halo' && state.calib.placing) { state.calib.placing = false; identify(-1); } renderTab(); });
@@ -135,7 +139,7 @@ function init() {
   $('#livePush').addEventListener('change', (e) => { if (e.target.checked) scheduleSync(); });
   window.addEventListener('keydown', (e) => {
     if (e.target.closest('input,select,textarea')) return;
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); setSel(range(0, 127)); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); setSel(GROUPS['All']); }
     else if (e.key === 'Escape') setSel([]);
     else if (state.tool === 'type' && e.key.length === 1) { const i = LABEL.findIndex((l) => l.toLowerCase() === e.key.toLowerCase()); if (i >= 0) simKey(i); }
   });

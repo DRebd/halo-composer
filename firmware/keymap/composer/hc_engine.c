@@ -509,6 +509,9 @@ void hc_render_led(const hc_scene_t *s, const hc_state_t *st, uint8_t led, uint3
 
         case HC_FX_RIPPLE: {
             const uint32_t life = 1500u;
+            // p2 >= 2: rings fade out by the time they have travelled p2 units
+            // (12 = one key); p2 0..1: they cross the whole board.
+            const uint32_t reach = z->p2 >= 2u ? z->p2 : 0u;
             uint8_t        x, y;
             hc_led_xy(s, led, &x, &y);
             uint16_t w = (uint16_t)(z->p1 / 8u + 2u);
@@ -518,12 +521,23 @@ void hc_render_led(const hc_scene_t *s, const hc_state_t *st, uint8_t led, uint3
                 if (h->led == 0xFF) continue;
                 uint32_t age = t - h->t;
                 if (age >= life) continue;
-                uint32_t r    = (age * (16u + z->speed / 2u)) / 256u;
-                uint16_t dist = dist_to(h->x, h->y, x, y);
+                uint32_t r = (age * (16u + z->speed / 2u)) / 256u;
+                uint32_t fade;
+                if (reach) {
+                    if (r >= reach) continue;
+                    fade = 255u - (r * 255u) / reach;
+                } else {
+                    fade = 255u - (age * 255u) / life;
+                }
+                // Keys are 12 units apart across but rows only 8 apart: weight rows
+                // 1.5x so rings are round on the real keyboard.
+                int32_t  dx   = (int32_t)x - h->x;
+                int32_t  dy   = (int32_t)y - h->y;
+                uint16_t dist = hc_isqrt32((uint32_t)(dx * dx) + ((uint32_t)(dy * dy) * 9u) / 4u);
                 uint32_t dd   = dist > r ? dist - r : r - dist;
                 if (dd >= w) continue;
                 uint8_t ring = (uint8_t)(((w - dd) * 255u) / w);
-                uint8_t f    = hc_scale8(ring, (uint8_t)(255u - (age * 255u) / life));
+                uint8_t f    = hc_scale8(ring, (uint8_t)fade);
                 if (f > e) e = f;
             }
             accent_of(z, c, acc);
@@ -648,35 +662,33 @@ void hc_scene_defaults(hc_scene_t *s) {
     s->magic   = HC_MAGIC;
     s->version = HC_SCENE_VERSION;
 
-    // Default look: warm white keys, WASD a slightly deeper warm tone,
-    // amber halo breathing between 50% and 100%.
+    // Default look: 2700K keys; a pressed key flashes light mint (#70FF94) for
+    // 560 ms and sends a mint ripple about two keys outwards; 2700K halo breathing between
+    // 30% and 100%. Colours are screen colours: the gamma flag makes the LEDs
+    // show them (and brightness steps) the way a monitor would.
+    static const uint8_t mint[3] = {0x70, 0xFF, 0x94};
+    s->flags = HC_SF_GAMMA;
     for (uint8_t i = 0; i < HC_LED_COUNT; i++) {
-        s->color[i][0] = 255;
-        s->color[i][1] = 200;
-        s->color[i][2] = 140;
+        s->color[i][0] = 255; // 2700K
+        s->color[i][1] = 167;
+        s->color[i][2] = 87;
         s->zone_of[i]  = i < HC_KEY_LEDS ? 0 : 2;
     }
-    static const uint8_t wasd[4] = {33, 47, 48, 49};
-    for (uint8_t i = 0; i < 4; i++) {
-        s->color[wasd[i]][0] = 255;
-        s->color[wasd[i]][1] = 170;
-        s->color[wasd[i]][2] = 70;
-        s->zone_of[wasd[i]]  = 1;
-    }
-    for (uint8_t i = HC_KEY_LEDS; i < HC_LED_COUNT; i++) {
-        s->color[i][0] = 255;
-        s->color[i][1] = 100;
-        s->color[i][2] = 16;
-    }
 
-    set_zone(&s->zones[0], HC_FX_STATIC, HC_SRC_MAP, 128, 0, 255);
-    set_zone(&s->zones[1], HC_FX_STATIC, HC_SRC_MAP, 128, 0, 200);
-    set_zone(&s->zones[2], HC_FX_BREATHE, HC_SRC_ZONE, 40, 128, 255);
+    // Ripple rests at v_min (full brightness) and draws rings in the accent colour.
+    set_zone(&s->zones[0], HC_FX_RIPPLE, HC_SRC_MAP, 56, 255, 255);
+    s->zones[0].p1       = 80;                                   // ring width
+    s->zones[0].p2       = 24;                                   // reach: two keys (12 units each)
+    s->zones[0].reactive = (uint8_t)(HC_RX_FLASH | (12u << 4)); // flash lasts 200 + (15 - 12) * 120 = 560 ms
+    memcpy(s->zones[0].color, mint, 3);
+    memcpy(s->zones[0].rx_color, mint, 3);
+    set_zone(&s->zones[1], HC_FX_STATIC, HC_SRC_MAP, 128, 0, 255);
+    set_zone(&s->zones[2], HC_FX_BREATHE, HC_SRC_ZONE, 40, 77, 255);
     s->zones[2].axis     = HC_AXIS_NONE;
     s->zones[2].spread   = 0;
     s->zones[2].color[0] = 255;
-    s->zones[2].color[1] = 100;
-    s->zones[2].color[2] = 16;
+    s->zones[2].color[1] = 167;
+    s->zones[2].color[2] = 87;
     for (uint8_t i = 3; i < HC_ZONES; i++) set_zone(&s->zones[i], HC_FX_STATIC, HC_SRC_MAP, 128, 0, 255);
 
     static const uint8_t sunset[3][4] = {{0, 255, 60, 0}, {128, 255, 0, 90}, {255, 90, 0, 255}};

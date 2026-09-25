@@ -36,14 +36,22 @@ function tabPaint(body) {
   const hexIn = el('input', { type: 'text', value: rgbHex(state.color), style: 'width:92px', 'aria-label': 'Hex color' });
   const setColor = (rgb, rerender = true) => { state.color = rgb; if (rerender) renderTab(); };
   hexIn.addEventListener('change', () => { const c = hexRgb(hexIn.value); if (c) setColor(c); });
-  cur.append(el('span', { class: 'sw', style: `width:46px;background:${rgbHex(state.color)}` }), colorInput(state.color, (c) => setColor(c)), hexIn,
+  // The picker updates everything in place while it is open; rebuilding the tab
+  // would destroy the <input> and close the browser's colour dialog.
+  const picker = colorInput(state.color, (c) => { setColor(c, false); refreshCur(true); });
+  cur.append(el('span', { class: 'sw', style: `width:46px;background:${rgbHex(state.color)}` }), picker, hexIn,
     el('span', { class: 'mono muted' }, `rgb ${state.color.join(' ')}`));
   const hsvRows = [
     slider('Hue', hsv[0], 0, 255, (v) => { hsv[0] = v; setColor(HC.util.hsv2rgb(hsv[0], hsv[1], hsv[2], [0, 0, 0]), false); refreshCur(); }),
     slider('Saturation', hsv[1], 0, 255, (v) => { hsv[1] = v; setColor(HC.util.hsv2rgb(hsv[0], hsv[1], hsv[2], [0, 0, 0]), false); refreshCur(); }, pct),
     slider('Brightness', hsv[2], 0, 255, (v) => { hsv[2] = v; setColor(HC.util.hsv2rgb(hsv[0], hsv[1], hsv[2], [0, 0, 0]), false); refreshCur(); }, pct),
   ];
-  function refreshCur() { cur.children[0].style.background = rgbHex(state.color); hexIn.value = rgbHex(state.color); cur.children[1].value = rgbHex(state.color); cur.children[3].textContent = `rgb ${state.color.join(' ')}`; }
+  function refreshCur(fromPicker = false) {
+    cur.children[0].style.background = rgbHex(state.color); hexIn.value = rgbHex(state.color); cur.children[3].textContent = `rgb ${state.color.join(' ')}`;
+    if (!fromPicker) { picker.value = rgbHex(state.color); return; }
+    HC.util.rgb2hsv(state.color, hsv);
+    hsvRows.forEach((row, k) => { row.querySelector('input').value = hsv[k]; row.querySelector('output').textContent = k ? pct(hsv[k]) : hsv[k]; });
+  }
   const none = !state.sel.size;
   body.append(
     el('div', { class: 'sec' }, el('h3', {}, 'Color'), cur, ...hsvRows),
@@ -84,20 +92,21 @@ function bakeControls() {
 }
 
 // Zones -----------------------------------------------------------------
-function zoneSummary(z) { return `${FX_META[z.effect]?.name || '?'} · ${['map', 'color', 'grad', 'rainbow'][z.source]}`; }
+function zoneSummary(z) { return `${FX_META[z.effect]?.name || '?'} · ${['painted', 'zone color', 'gradient', 'rainbow'][z.source]}`; }
 function tabZones(body) {
   const s = state.scene, zi = state.zone, z = s.zones[zi];
-  const counts = new Array(ZONES).fill(0); for (let i = 0; i < LED_COUNT; i++) counts[s.zoneOf[i] & 7]++;
+  const counts = new Array(ZONES).fill(0); for (let i = 0; i < LED_COUNT; i++) if (!ABSENT.has(i)) counts[s.zoneOf[i] & 7]++;
   const upd = (fn) => { fn(z); markZone(zi); };
   const updR = (fn) => { upd(fn); renderTab(); };
   const meta = FX_META[z.effect];
   const params = [];
-  for (const key of ['p1', 'p2']) if (meta.p[key]) { const [lab, mn, mx] = meta.p[key]; params.push(slider(lab, clamp(z[key], mn, mx), mn, mx, (v) => upd((q) => { q[key] = v; }))); }
+  for (const key of ['p1', 'p2']) if (meta.p[key]) { const [lab, mn, mx, fmt] = meta.p[key]; params.push(slider(lab, clamp(z[key], mn, mx), mn, mx, (v) => upd((q) => { q[key] = v; }), fmt)); }
   const usesAccent = [FX.SPARKLE, FX.RAINDROPS, FX.RIPPLE, FX.HEATMAP].includes(z.effect);
   body.append(
     el('div', { class: 'sec' }, el('h3', {}, 'Zones'),
-      el('div', { class: 'zones' }, s.zones.map((q, i) => el('button', { class: 'zbtn' + (i === zi ? ' on' : ''), onclick: () => { state.zone = i; renderTab(); } },
-        el('b', {}, el('span', { class: 'chip', style: `background:${ZONE_TINTS[i]};margin-right:5px` }), `${i + 1} ${state.zoneNames[i]}`), el('small', {}, `${counts[i]} LEDs · ${zoneSummary(q)}`)))),
+      el('div', { class: 'zones' }, s.zones.map((q, i) => el('button', { class: 'zbtn' + (i === zi ? ' on' : '') + (counts[i] ? '' : ' empty'), title: `Zone ${i + 1} · ${state.zoneNames[i]} · ${counts[i]} LEDs · ${zoneSummary(q)}`, onclick: () => { state.zone = i; renderTab(); } },
+        el('span', { class: 'znum', style: `background:${ZONE_TINTS[i]}` }, String(i + 1)),
+        el('span', { class: 'zmeta' }, el('b', {}, state.zoneNames[i]), el('small', {}, counts[i] ? `${counts[i]} LED${counts[i] === 1 ? '' : 's'}` : 'empty'), el('small', {}, zoneSummary(q)))))),
       el('div', { class: 'row' },
         el('button', { class: 'btn primary', 'data-needs-sel': true, disabled: !state.sel.size, onclick: () => { const sel = curSel(); for (const l of sel) s.zoneOf[l] = (s.zoneOf[l] & ~LF.ZONE_MASK) | zi; markZmap(sel); updateSelInfo(); renderTab(); toast(`${sel.length} LED(s) moved to zone ${zi + 1}.`); } }, `Put selection in zone ${zi + 1}`),
         el('button', { class: 'btn', onclick: () => { setSel(range(0, 127).filter((l) => (s.zoneOf[l] & 7) === zi)); } }, 'Select this zone'),
@@ -181,6 +190,7 @@ function demoScene(fxId) {
   if (fxId === FX.COMET) { z.axis = AXIS.RING; z.p1 = 70; z.vMin = 10; }
   if (fxId === FX.SPARKLE || fxId === FX.RAINDROPS) { z.p1 = 60; }
   if (fxId === FX.REACT_FADE || fxId === FX.RIPPLE || fxId === FX.HEATMAP) { z.vMin = 25; z.color = [0, 220, 255]; }
+  if (fxId === FX.RIPPLE) z.p2 = 0; // whole board
   if (fxId === FX.SATWAVE) z.p2 = 230;
   if (fxId === FX.HUE_DRIFT) z.p1 = 60;
   s.zones[0] = z;
@@ -192,7 +202,7 @@ function tabEffects(body) {
   const grid = el('div', { class: 'fxgrid' });
   for (const m of FX_META) {
     if (m.id === FX.OFF) continue;
-    const c = el('canvas', { width: 300, height: 132 });
+    const c = el('canvas', { width: 300, height: 136 });
     fxPreviews.push({ canvas: c, scene: demoScene(m.id), engine: new HC.HcEngine(keyXY), reactive: [FX.REACT_FADE, FX.RIPPLE, FX.HEATMAP].includes(m.id), lastHit: 0, buf: new Uint8Array(LED_COUNT * 3) });
     grid.append(el('div', { class: 'fxcard' }, c, el('div', {}, el('h4', {}, m.name), el('p', {}, m.desc),
       el('button', { class: 'btn small', onclick: () => { const z = state.scene.zones[state.zone]; z.effect = m.id; markZone(state.zone); state.tab = 'zones'; renderTab(); toast(`Zone ${state.zone + 1} now uses ${m.name}.`); } }, `Use in zone ${state.zone + 1}`))));
@@ -203,10 +213,11 @@ function drawFxPreviews(t) {
   for (const p of fxPreviews) {
     if (p.reactive && t - p.lastHit > 260) { p.lastHit = t; const pool = GROUPS['Letters']; p.engine.keyHit(p.scene, pool[(Math.random() * pool.length) | 0], t); }
     p.engine.renderFrame(p.scene, t, { keys: 255, halo: 255 }, p.buf);
-    const c = p.canvas.getContext('2d'), W = p.canvas.width, H = p.canvas.height, u = W / 19.0, ox = 1.5 * u, oy = 1.65 * u;
+    const c = p.canvas.getContext('2d'), W = p.canvas.width, H = p.canvas.height, u = W / (16 + 2 * BEZEL.side + 0.4), ox = (BEZEL.side + 0.2) * u, oy = (BEZEL.top + 0.2) * u;
+    const rgb = (l) => `rgb(${DISP[p.buf[l * 3]]},${DISP[p.buf[l * 3 + 1]]},${DISP[p.buf[l * 3 + 2]]})`;
     c.fillStyle = '#08090b'; c.fillRect(0, 0, W, H);
-    for (let i = 0; i < HALO_LEDS; i++) { const x = p.scene.haloXY[i * 2], y = p.scene.haloXY[i * 2 + 1], led = KEY_LEDS + i; c.fillStyle = `rgb(${p.buf[led * 3]},${p.buf[led * 3 + 1]},${p.buf[led * 3 + 2]})`; c.beginPath(); c.arc(ox + ((x - 16) / 12) * u, oy + ((y - 12) / 8) * u, u * 0.2, 0, 7); c.fill(); }
-    for (const k of KEYS) { const l = k.led; c.fillStyle = `rgb(${p.buf[l * 3]},${p.buf[l * 3 + 1]},${p.buf[l * 3 + 2]})`; c.fillRect(ox + k.x * u + 1, oy + k.y * u + 1, k.w * u - 2, u - 2); }
+    for (let i = 0; i < HALO_LEDS; i++) { const led = KEY_LEDS + i; if (ABSENT.has(led)) continue; const [ux, uy] = engUnits(p.scene.haloXY[i * 2], p.scene.haloXY[i * 2 + 1]); c.fillStyle = rgb(led); c.beginPath(); c.arc(ox + ux * u, oy + uy * u, u * 0.16, 0, 7); c.fill(); }
+    for (const k of KEYS) { c.fillStyle = rgb(k.led); c.fillRect(ox + k.x * u + 1, oy + k.y * u + 1, k.w * u - 2, u - 2); }
   }
 }
 
@@ -228,7 +239,7 @@ function tabScenes(body) {
         el('button', { class: 'btn small', onclick: () => downloadJson(p, p.name) }, 'Export'),
         el('button', { class: 'btn small', onclick: () => { lib.splice(i, 1); saveLibrary(lib); renderTab(); } }, 'Delete')))) : el('p', { class: 'hint' }, 'Nothing saved yet.'),
       el('div', { class: 'row' }, el('button', { class: 'btn', onclick: () => downloadJson(exportProfile(nameIn.value.trim() || 'halo-scene'), nameIn.value.trim() || 'halo-scene') }, 'Export current as file'), el('button', { class: 'btn', onclick: () => file.click() }, 'Import file…'), file)),
-    el('p', { class: 'hint' }, 'The keyboard stores one scene (the one you Save). Keep as many as you like here and push any of them. Scenes here live in this browser only, for this web address: use Export to move them between computers or browsers. Loading a scene never changes your halo calibration.'),
+    el('p', { class: 'hint' }, 'The keyboard stores one scene (the one you Save). Warm Desk is the factory look. Keep as many as you like here and push any of them. Scenes here live in this browser only, for this web address: use Export to move them between computers or browsers. Loading a scene never changes your halo calibration.'),
   );
 }
 function loadLibrary() { try { return JSON.parse(localStorage.getItem(LS_KEY + '/library') || '[]'); } catch (e) { return []; } }

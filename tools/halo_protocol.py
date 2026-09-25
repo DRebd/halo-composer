@@ -19,6 +19,8 @@ OK, E_ARG, E_UNKNOWN = 0, 1, 2
 
 LED_COUNT, KEY_LEDS, HALO_LEDS, ZONES, GRADIENTS = 128, 83, 45, 8, 4
 ZONE_BYTES, GRAD_BYTES = 20, 26
+# Halo LEDs with no LED fitted on the Halo75 V2 (0-based halo numbers; tools/gen_geometry.py ABSENT)
+ABSENT_HALO = (8, 9, 44)
 # hc_scene_t layout (packed, little-endian)
 OFF_COLOR, OFF_ZONE_OF, OFF_ZONES, OFF_GRAD, OFF_HALO_XY, OFF_HALO_RING = 4, 388, 516, 676, 780, 870
 SCENE_BYTES = 915

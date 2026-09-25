@@ -2,9 +2,8 @@
 """Generates Halo75 V2 LED geometry for Halo Composer (firmware C + GUI JSON).
 
 Key positions come from keyboard.json (LAYOUT_ansi_84) mapped into QMK's
-224x64 space. Halo positions/ring order are a best-effort INFERENCE from
-NuPhy's side.c power-on order + group bitmasks and MUST be verified with the
-GUI's calibration wizard on real hardware.
+224x64 space. Halo positions were measured on a real keyboard with Halo Studio's
+calibration wizard; ring order is derived from them (same maths as Studio).
 """
 import json, sys, math
 
@@ -22,39 +21,65 @@ def key_xy(k):
 
 key_xy_list = [key_xy(k) for k in KEYS]
 
-# --- halo (indices 83..127). Inferred physical ring, clockwise on screen:
-H = {}
-def line(leds, x0, y0, x1, y1):
-    n = len(leds)
-    for k, led in enumerate(leds):
-        f = 0.5 if n == 1 else k / (n - 1)
-        H[led] = (round(x0 + (x1 - x0) * f), round(y0 + (y1 - y0) * f))
-front = [125,126,127,92,91,90,89,88] + list(range(93,104))       # 19, right -> left
-left  = list(range(104,111))                                     # 7, front -> back
-status= list(range(83,88))                                       # 5, top-left surface bar
-back  = list(range(111,118))                                     # 7, left -> right
-badge = [118,119]                                                # 2, top-right badge (?)
-right = list(range(120,125))                                     # 5, back -> front
-line(front, 214, 62, 10, 62)
-line(left, 2, 56, 2, 8)
-line(status, 14, 5, 38, 5)
-line(back, 60, 2, 172, 2)
-line(badge, 194, 5, 206, 5)
-line(right, 222, 8, 222, 56)
-assert sorted(H) == list(range(83,128)), sorted(set(range(83,128)) - set(H))
-ring_seq = right[2:] + front + left + status + back + badge + right[:2]  # starts at right-middle (angle 0)
-assert len(ring_seq) == 45 and len(set(ring_seq)) == 45
-ring = {led: (i * 256) // 45 for i, led in enumerate(ring_seq)}
+# --- halo (indices 83..127). Positions MEASURED on a real Halo75 V2 with Halo
+# Studio's calibration wizard (2026-09-25; LED 36 corrected by hand). The group
+# names are the original inference from NuPhy's side.c and only label areas.
+front = [125,126,127,92,91,90,89,88] + list(range(93,104))       # right -> left
+left  = list(range(104,111))                                     # front -> back
+status= list(range(83,88))                                       # top-left surface bar
+back  = list(range(111,118))                                     # left -> right
+badge = [118,119]                                                # top-right
+right = list(range(120,125))                                     # back -> front
 groups = {}
-for led in front: groups[led] = 'front'
-for led in left: groups[led] = 'left'
-for led in right: groups[led] = 'right'
-for led in back: groups[led] = 'back'
-for led in status: groups[led] = 'status'
-for led in badge: groups[led] = 'badge'
+for name, leds in (('front', front), ('left', left), ('right', right), ('back', back), ('status', status), ('badge', badge)):
+    for led in leds: groups[led] = name
+assert sorted(groups) == list(range(83,128))
+
+CALIBRATED = [  # halo LED 1..45 = index 83..127, engine coordinates (x 0..224, y 0..64)
+    (16,5), (19,5), (22,5), (25,5), (28,5),                      # 1-5 status bar
+    (169,53), (169,56), (169,59),                                # 6-8 short vertical strip
+    None, None,                                                  # 9-10 not fitted
+    (164,61), (149,61), (136,61), (126,61), (112,61), (100,61), (87,61), (74,61), (61,61), (49,61), (35,61), (20,61),
+    (7,57), (7,48), (7,38), (7,27), (7,20),                      # 23-27 left side
+    (40,9), (57,9), (76,9), (96,9), (115,9), (134,9), (150,9), (175,9), (169,9),
+    (215,16), (215,26), (215,36), (215,44), (214,56),            # 37-41 right side
+    (196,62), (184,62), (174,62),
+    None,                                                        # 45 not fitted
+]
+assert len(CALIBRATED) == 45
+# Halo LEDs that light nothing on this board (NuPhy's driver has channels for
+# them but no LED is fitted). Studio hides and skips them; ring order ignores them.
+ABSENT = [i for i, p in enumerate(CALIBRATED) if p is None]      # 0-based: 8, 9, 44
+
+H = {}
+for i, p in enumerate(CALIBRATED):
+    if p is None:  # park on the nearest fitted neighbour so nothing looks odd if drawn
+        j = next(k for d in range(1, 45) for k in (i - d, i + d) if 0 <= k < 45 and CALIBRATED[k] is not None)
+        p = CALIBRATED[j]
+    H[83 + i] = p
+
+
+def ring_from_xy(xy, absent):
+    """Perimeter coordinate per halo LED. Same maths as recomputeRing() in studio/studio_e.js."""
+    live = [i for i in range(len(xy)) if i not in absent]
+    xs = [xy[i][0] for i in live]; ys = [xy[i][1] for i in live]
+    x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+    w, h = max(1, x1 - x0), max(1, y1 - y0)
+    P, cy = 2 * (w + h), (y0 + y1) / 2
+    out = [0] * len(xy)
+    for i in range(len(xy)):
+        x, y = xy[i]
+        d = [x1 - x, y1 - y, x - x0, y - y0]  # right, bottom, left, top
+        e = d.index(min(d))
+        if e == 0: p = y - cy if y >= cy else P - (cy - y)
+        elif e == 1: p = h / 2 + (x1 - x)
+        elif e == 2: p = h / 2 + w + (y1 - y)
+        else: p = h / 2 + w + h + (x - x0)
+        out[i] = math.floor((p * 256) / P) & 255
+    return out
 
 halo_xy = [H[i] for i in range(83,128)]
-halo_ring = [ring[i] for i in range(83,128)]
+halo_ring = ring_from_xy(halo_xy, ABSENT)
 
 def c_arrays():
     out = []
@@ -63,7 +88,7 @@ def c_arrays():
     out.append('const uint8_t hc_key_xy[HC_KEY_LEDS][2] = {')
     out.append('    ' + ', '.join('{%d, %d}' % p for p in key_xy_list))
     out.append('};\n')
-    out.append('// Halo positions are INFERRED (see docs). Verify with the calibration wizard.')
+    out.append('// Halo positions measured with the calibration wizard (see tools/gen_geometry.py).')
     out.append('const uint8_t hc_default_halo_xy[HC_HALO_LEDS][2] = {')
     out.append('    ' + ', '.join('{%d, %d}' % p for p in halo_xy))
     out.append('};\n')
@@ -80,12 +105,12 @@ if __name__ == '__main__':
     what = sys.argv[1] if len(sys.argv) > 1 else 'write'
     if what == 'write':
         here = __import__('pathlib').Path(__file__).resolve().parent
-        (here.parent / 'composer' / 'hc_board_geometry.c').write_text(c_arrays())
+        (here.parent / 'firmware' / 'keymap' / 'composer' / 'hc_board_geometry.c').write_bytes(c_arrays().encode())
         (here.parent / 'studio' / 'geometry.json').write_text(json.dumps({
             'keys': [{'led': k[0], 'label': k[1], 'x': k[2], 'y': k[3], 'w': k[4], 'px': key_xy_list[k[0]][0], 'py': key_xy_list[k[0]][1]} for k in KEYS],
-            'halo': [{'led': 83 + i, 'x': halo_xy[i][0], 'y': halo_xy[i][1], 'ring': halo_ring[i], 'group': groups[83+i]} for i in range(45)],
-        }, separators=(',', ':')) + '\n')
-        print('wrote composer/hc_board_geometry.c and studio/geometry.json (keymap.c points: run with "points")')
+            'halo': [{'led': 83 + i, 'x': halo_xy[i][0], 'y': halo_xy[i][1], 'ring': halo_ring[i], 'group': groups[83+i], **({'absent': True} if i in ABSENT else {})} for i in range(45)],
+        }, separators=(',', ':')) + '\n', newline='\n')
+        print('wrote firmware/keymap/composer/hc_board_geometry.c and studio/geometry.json (keymap.c points: run with "points")')
     if what == 'c':
         print(c_arrays(), end='')
     elif what == 'points':
@@ -93,5 +118,5 @@ if __name__ == '__main__':
     elif what == 'json':
         print(json.dumps({
             'keys': [{'led': k[0], 'label': k[1], 'x': k[2], 'y': k[3], 'w': k[4], 'px': key_xy_list[k[0]][0], 'py': key_xy_list[k[0]][1]} for k in KEYS],
-            'halo': [{'led': 83 + i, 'x': halo_xy[i][0], 'y': halo_xy[i][1], 'ring': halo_ring[i], 'group': groups[83+i]} for i in range(45)],
+            'halo': [{'led': 83 + i, 'x': halo_xy[i][0], 'y': halo_xy[i][1], 'ring': halo_ring[i], 'group': groups[83+i], **({'absent': True} if i in ABSENT else {})} for i in range(45)],
         }, separators=(',', ':')))

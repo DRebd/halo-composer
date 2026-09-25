@@ -21,3 +21,9 @@
 // Stock effects remain one Fn+Left / Fn+Shift+Left away.
 #undef RGB_MATRIX_DEFAULT_MODE
 #define RGB_MATRIX_DEFAULT_MODE RGB_MATRIX_CUSTOM_composer
+
+// Caps Lock: magenta (not red, which the battery uses) on both the status bar and
+// the Caps key. Fn+Caps still cycles bar / key / both / off (ryodeushii's setting).
+#define CAPS_INDICATOR_RGB 0x80, 0x00, 0x80
+#undef DEFAULT_CAPS_INDICATOR_TYPE
+#define DEFAULT_CAPS_INDICATOR_TYPE CAPS_INDICATOR_BOTH

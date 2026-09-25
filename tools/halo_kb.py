@@ -320,7 +320,8 @@ def cmd_walk(args):
             raise ViaError("turn Composer on first (python tools/halo_kb.py on)")
         s = c.read_scene()
         ring = s[hp.OFF_HALO_RING:hp.OFF_HALO_RING + hp.HALO_LEDS]
-        order = sorted(range(hp.HALO_LEDS), key=lambda i: ring[i]) if args.order == "ring" else list(range(hp.HALO_LEDS))
+        fitted = [i for i in range(hp.HALO_LEDS) if i not in hp.ABSENT_HALO]
+        order = sorted(fitted, key=lambda i: ring[i]) if args.order == "ring" else fitted
         for i in order:
             print(f"halo LED {i:2d} (index {hp.KEY_LEDS + i}, ring {ring[i]:3d})", flush=True)
             c.identify(hp.KEY_LEDS + i, (255, 150, 30), args.ms + 200)

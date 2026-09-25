@@ -106,6 +106,19 @@ let packets = 0;
   // 8d. a scene file with an unknown effect is rejected, not half-loaded
   const rej = await p.evaluate(() => { const bad = HaloStudio.exportProfile('bad'); const by = Uint8Array.from(atob(bad.scene), (c) => c.charCodeAt(0)); by[516] = 30; bad.scene = btoa(String.fromCharCode(...by)); try { HaloStudio.importProfile(bad); return 'accepted'; } catch (e) { return e.message; } });
   ok(/doesn't know/.test(rej), 'importing a scene with an unknown effect is rejected', rej);
+  // 8f. the Paint tab's colour picker survives picking (rebuilding the tab closed the browser's picker)
+  await p.click('#tabs button[data-tab=paint]');
+  const pk = await p.evaluate(() => {
+    const i = document.querySelector('#tabbody input[type=color]'); i.dataset.probe = '1';
+    i.value = '#70ff94'; i.dispatchEvent(new Event('input', { bubbles: true }));
+    const j = document.querySelector('#tabbody input[type=color]');
+    return { same: !!j && j.dataset.probe === '1' && j.isConnected, color: HaloStudio.state.color.join(), hex: document.querySelector('#tabbody input[type=text]').value };
+  });
+  ok(pk.same && pk.color === '112,255,148' && pk.hex === '#70ff94', 'Paint colour picker stays open while picking and applies the colour', JSON.stringify(pk));
+  // 8g. halo LEDs with nothing fitted (9, 10, 45) are left out of selections
+  await p.click('#quickSel >> text="All"');
+  const sa = await p.evaluate(() => [HaloStudio.state.sel.size, [91, 92, 127].some((l) => HaloStudio.state.sel.has(l))]);
+  ok(sa[0] === 125 && !sa[1], 'unfitted halo LEDs are left out of quick-selects', JSON.stringify(sa));
   // 8e. a keyboard without Composer firmware gets a clear message and no connection
   const p2 = await newStudioPage();
   await p2.goto(html + '?stock=1'); await p2.waitForTimeout(400);

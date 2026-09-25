@@ -39,7 +39,7 @@ const FX_META = [
   { id: FX.COMET, name: 'Comet', desc: 'Bright heads with fading tails travel along the axis. Use the Ring axis to orbit the halo.', p: { p1: ['Tail length', 1, 255], p2: ['Comets', 1, 8] } },
   { id: FX.STROBE, name: 'Strobe', desc: 'Hard blink between Max and Min. Good for alerts, not for all day.', p: { p1: ['On time (duty)', 0, 255] } },
   { id: FX.REACT_FADE, name: 'Reactive fade', desc: 'Sits at Min until you press a key; that key jumps to Max and fades. Speed sets how long the fade lasts.', p: {} },
-  { id: FX.RIPPLE, name: 'Ripple', desc: 'Every keypress sends out a ring of the accent color. Rings roll outward and reach the halo.', p: { p1: ['Ring width', 0, 255] } },
+  { id: FX.RIPPLE, name: 'Ripple', desc: 'Every keypress sends out a ring of the accent color. Min bright is the resting brightness, Max bright the ring. Reach sets how far rings travel before fading (slide fully left for the whole board). Rings reach any halo LEDs in the same zone.', p: { p1: ['Ring width', 0, 255], p2: ['Reach', 1, 255, (v) => (v < 2 ? 'whole board' : `${(v / 12).toFixed(1)} keys`)] } },
   { id: FX.HEATMAP, name: 'Heatmap', desc: 'Keys you use a lot drift toward the accent color and cool down over about 10 seconds.', p: {} },
   { id: FX.OFF, name: 'Off', desc: 'LEDs in this zone stay dark.', p: {} },
 ];
@@ -55,11 +55,14 @@ const cycleMs = (speed) => Math.round((65536 * 4) / (speed + 16));
 const KEYS = GEOM.keys;
 const LABEL = KEYS.map((k) => k.label);
 const byLabel = (...ls) => ls.map((l) => LABEL.indexOf(l)).filter((i) => i >= 0);
-const HALO_GROUP = (g) => GEOM.halo.filter((h) => h.group === g).map((h) => h.led);
+// Halo LEDs with no LED fitted (geometry.json "absent"): hidden, skipped by calibration and quick-selects.
+const ABSENT = new Set(GEOM.halo.filter((h) => h.absent).map((h) => h.led));
+const fitted = (leds) => leds.filter((l) => !ABSENT.has(l));
+const HALO_GROUP = (g) => fitted(GEOM.halo.filter((h) => h.group === g).map((h) => h.led));
 const GROUPS = {
-  'All': range(0, 127),
+  'All': fitted(range(0, 127)),
   'Keys': range(0, 82),
-  'Halo': range(83, 127),
+  'Halo': fitted(range(83, 127)),
   'WASD': [33, 47, 48, 49],
   'Arrows': [72, 80, 81, 82],
   'Letters': [...range(32, 41), ...range(47, 55), ...range(61, 67)],
@@ -85,7 +88,7 @@ const K = (k) => { // Kelvin -> rgb (Tanner Helland approximation)
 const COLOR_PRESETS = [
   ['Whites', [['Candle 1900K', K(1900)], ['Warm 2700K', K(2700)], ['Soft 3500K', K(3500)], ['Neutral 4500K', K(4500)], ['Daylight 6500K', K(6500)], ['Pure white', [255, 255, 255]]]],
   ['Warm', [['Amber', [255, 110, 16]], ['Honey', [255, 170, 40]], ['Deep WASD tone', [255, 170, 70]], ['Copper', [230, 90, 40]], ['Ember', [255, 55, 0]], ['Crimson', [255, 0, 40]]]],
-  ['Cool', [['Ice', [170, 220, 255]], ['Sky', [60, 160, 255]], ['Ocean', [0, 80, 255]], ['Teal', [0, 200, 170]], ['Mint', [80, 255, 160]], ['Violet', [140, 40, 255]]]],
+  ['Cool', [['Ice', [170, 220, 255]], ['Sky', [60, 160, 255]], ['Ocean', [0, 80, 255]], ['Teal', [0, 200, 170]], ['Mint', [112, 255, 148]], ['Violet', [140, 40, 255]]]],
   ['Vivid', [['Magenta', [255, 0, 160]], ['Rose', [255, 80, 120]], ['Lime', [170, 255, 0]], ['Cyan', [0, 255, 255]], ['Gold', [255, 200, 0]], ['Off', [0, 0, 0]]]],
 ];
 const GRAD_PRESETS = {
@@ -113,9 +116,18 @@ function makeGradient(name) {
 const Z = (over) => Object.assign(HC.blankZone(), over);
 function paint(s, leds, rgb) { for (const i of leds) { s.color[i * 3] = rgb[0]; s.color[i * 3 + 1] = rgb[1]; s.color[i * 3 + 2] = rgb[2]; } }
 function assign(s, leds, z) { for (const i of leds) s.zoneOf[i] = (s.zoneOf[i] & ~LF.ZONE_MASK) | z; }
-function baseScene() { const s = HC.defaultScene(GEOM); return s; }
+// Starter scenes build on the original neutral base (warm white keys, WASD zone,
+// amber halo, raw LED values) so they look the same as before the default changed.
+function baseScene() {
+  const s = HC.defaultScene(GEOM); s.flags = 0;
+  paint(s, range(0, 82), [255, 200, 140]); paint(s, range(83, 127), [255, 100, 16]); assign(s, range(0, 82), 0);
+  paint(s, [33, 47, 48, 49], [255, 170, 70]); assign(s, [33, 47, 48, 49], 1);
+  s.zones[1] = Z({ effect: FX.STATIC, vMax: 200 });
+  s.zones[2] = Z({ effect: FX.BREATHE, source: SRC.ZONE, color: [255, 100, 16], vMin: 128, vMax: 255, speed: 40, axis: AXIS.NONE, spread: 0 });
+  return s;
+}
 const SCENES = [
-  { name: 'Warm Desk', note: 'Warm white keys, deeper WASD, amber halo breathing 50–100%.', names: ['Keys', 'WASD', 'Halo'], build: () => baseScene() },
+  { name: 'Warm Desk', note: 'The factory look: 2700K keys that flash mint and send a short mint ripple when pressed; 2700K halo breathing 30–100%.', names: ['Keys', 'Zone 2', 'Halo'], build: () => HC.defaultScene(GEOM) },
   { name: 'Ember Comet', note: 'Soft warm keys; two ember comets orbit the halo; keypresses echo on the halo.', names: ['Keys', 'WASD', 'Halo'], build: () => {
     const s = baseScene(); s.grad[2] = makeGradient('Ember');
     s.zones[0] = Z({ effect: FX.STATIC, vMax: 170 });

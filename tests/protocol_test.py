@@ -9,12 +9,17 @@ buffer) live below.
 Usage: protocol_test.py <path to host_device binary>
 """
 import pathlib
+import re
 import subprocess
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tools"))
 import composer_checks  # noqa: E402
 import halo_protocol as hp  # noqa: E402
+
+_ENGINE = pathlib.Path(__file__).resolve().parent.parent / "firmware/keymap/composer/hc_engine.c"
+GAMMA22 = [int(v) for v in re.search(r"gamma22\[256\] = \{([^}]*)\}", _ENGINE.read_text()).group(1).split(",") if v.strip()]
+assert len(GAMMA22) == 256
 
 
 class FakeKeyboard:
@@ -86,17 +91,18 @@ def main():
     c.save()
     check("SAVE: EEPROM image == RAM image", kb.eeprom() == kb.scene())
 
-    # Default look: halo (zone 2) breathes amber between 50% and 100%.
+    # Default look (perceptual gamma on): 2700K keys, 2700K halo breathing 30%..100%.
+    g = GAMMA22
     c.defaults()
     c.set_active(True)
     halo_led = 100
     vals = [kb.frame(t)[halo_led * 3] for t in range(0, 6000, 50)]
-    check("default halo breathes 50%..100% (red channel 128..255)",
-          min(vals) >= 126 and max(vals) >= 250 and min(vals) <= 132, f"min {min(vals)} max {max(vals)}")
+    check("default halo breathes 30%..100% (red channel gamma(77)..255)",
+          g[74] <= min(vals) <= g[80] and max(vals) >= 250, f"min {min(vals)} max {max(vals)}")
     keys = kb.frame(1234)
-    check("default keys are warm white (255,200,140)", tuple(keys[0:3]) == (255, 200, 140), keys[0:3].hex())
-    check("default WASD is deeper warm (255,170,70) at 78%", tuple(keys[33 * 3:33 * 3 + 3]) == tuple(v * 201 >> 8 for v in (255, 170, 70)),
-          keys[33 * 3:33 * 3 + 3].hex())
+    want = tuple(g[v] for v in (255, 167, 87))
+    check("default keys are 2700K (255,167,87) through gamma", tuple(keys[0:3]) == want and tuple(keys[33 * 3:33 * 3 + 3]) == want,
+          keys[0:3].hex() + " " + keys[33 * 3:33 * 3 + 3].hex())
 
     # IDENTIFY: exactly one LED lit, everything else black, then it expires.
     kb.frame(1000)  # sets the fake's clock; IDENTIFY's timeout counts from here
@@ -107,15 +113,20 @@ def main():
     f = kb.frame(1000 + 40)
     check("IDENTIFY expires after its duration", sum(1 for i in range(128) if f[i * 3:i * 3 + 3] != b"\0\0\0") > 1)
 
-    # Reactive: a key press drives a flash overlay on that key.
+    # Default reaction: the pressed key flashes mint for 560 ms; a mint ring spreads about two keys.
     c.defaults()
-    z = bytearray(c.cmd(hp.GET_ZONE, [0])[:hp.ZONE_BYTES])
-    z[13] = 0xF1  # flash, slowest fade
-    c.cmd(hp.SET_ZONE, [0, *z])
-    before = kb.frame(50000)[16 * 3:16 * 3 + 3]
-    kb.key(1, 0)  # ` key = LED 16
-    after = kb.frame(50000)[16 * 3:16 * 3 + 3]
-    check("key press flashes that key toward white", after[2] > before[2], f"{before.hex()} -> {after.hex()}")
+    base = kb.frame(50000)
+    kb.key(1, 0)  # ` key = LED 16 at (22, 24); the hit is stamped at t = 50000
+    f = kb.frame(50050)
+    k16 = f[16 * 3:16 * 3 + 3]
+    check("key press flashes that key toward mint", k16[0] < base[48] and k16[1] > base[49], f"{base[48:51].hex()} -> {k16.hex()}")
+    f = kb.frame(50070)  # ring radius 12 units = the next key (1, LED 17)
+    check("the ripple reaches the next key", f[17 * 3 + 1] > base[17 * 3 + 1] and f[17 * 3] < base[17 * 3],
+          f"{base[51:54].hex()} -> {f[51:54].hex()}")
+    far = [kb.frame(50000 + dt)[20 * 3:20 * 3 + 3] for dt in range(0, 700, 20)]  # 4 key (LED 20) is 4 keys away
+    check("the ripple stops after about two keys", all(v == base[60:63] for v in far), "")
+    f = kb.frame(50600)
+    check("the flash is over after 560 ms", f[16 * 3:16 * 3 + 3] == base[16 * 3:16 * 3 + 3], f[48:51].hex())
 
     kb.close()
     fails = [r for r in results if not r[1]]

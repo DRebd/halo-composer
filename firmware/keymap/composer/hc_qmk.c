@@ -130,6 +130,11 @@ static void set_active(bool on) {
     }
 }
 
+// Fn+Enter (keymap.c): jump to Composer, or back to the effect used before it.
+void hc_toggle(void) {
+    set_active(!hc_is_active());
+}
+
 static void hc_handle_hid(uint8_t *data) {
     uint8_t a[29];
     memcpy(a, &data[2], sizeof(a)); // arguments, before we overwrite data[2] with the status

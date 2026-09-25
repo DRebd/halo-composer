@@ -24,8 +24,49 @@ index 3c53a3e..9cb640e 100644
              pwr_rgb_led_on();
          } else { // brightness is 0 or RGB off.
              pwr_rgb_led_off();
+diff --git a/keyboards/nuphy/common/config/config.h b/keyboards/nuphy/common/config/config.h
+index 3541ded..533bd4f 100644
+--- a/keyboards/nuphy/common/config/config.h
++++ b/keyboards/nuphy/common/config/config.h
+@@ -58,6 +58,11 @@
+ #    define RELEASE_DEBOUNCE 10
+ #endif
+ 
++// Caps Lock indicator colour (status bar and/or the Caps key), as r, g, b.
++#ifndef CAPS_INDICATOR_RGB
++#    define CAPS_INDICATOR_RGB 0x00, 0x80, 0x80
++#endif
++
+ #ifndef DEFAULT_CAPS_INDICATOR_TYPE
+ #    define DEFAULT_CAPS_INDICATOR_TYPE CAPS_INDICATOR_SIDE
+ #endif
+diff --git a/keyboards/nuphy/common/core/keyboard.c b/keyboards/nuphy/common/core/keyboard.c
+index 99b9280..bd124da 100644
+--- a/keyboards/nuphy/common/core/keyboard.c
++++ b/keyboards/nuphy/common/core/keyboard.c
+@@ -568,16 +568,16 @@ bool rgb_matrix_indicators_nuphy(void) {
+     if (showCapsLock) {
+         switch (keyboard_config.common.caps_indicator_type) {
+             case CAPS_INDICATOR_SIDE:
+-                set_indicator_on_side(0X00, 0x80, 0x80);
++                set_indicator_on_side(CAPS_INDICATOR_RGB);
+ 
+                 break;
+             case CAPS_INDICATOR_UNDER_KEY:
+-                user_set_rgb_color(caps_key_led_idx, 0, 0x80, 0x80);
++                user_set_rgb_color(caps_key_led_idx, CAPS_INDICATOR_RGB);
+ 
+                 break;
+             case CAPS_INDICATOR_BOTH:
+-                set_indicator_on_side(0X00, 0x80, 0x80);
+-                user_set_rgb_color(caps_key_led_idx, 0, 0x80, 0x80);
++                set_indicator_on_side(CAPS_INDICATOR_RGB);
++                user_set_rgb_color(caps_key_led_idx, CAPS_INDICATOR_RGB);
+ 
+                 break;
+             case CAPS_INDICATOR_OFF:
 diff --git a/keyboards/nuphy/halo75v2/ansi/side.c b/keyboards/nuphy/halo75v2/ansi/side.c
-index dba8ca4..7e7daff 100644
+index dba8ca4..cd5ace4 100644
 --- a/keyboards/nuphy/halo75v2/ansi/side.c
 +++ b/keyboards/nuphy/halo75v2/ansi/side.c
 @@ -24,6 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
@@ -39,6 +80,15 @@ index dba8ca4..7e7daff 100644
  #define SIDE_INDEX 83
  
  #define SIDE_LED_COUNT 5
+@@ -421,7 +425,7 @@ static void halo_side_indicators_show(void) {
+         switch (keyboard_config.common.caps_indicator_type) {
+             case CAPS_INDICATOR_SIDE:
+             case CAPS_INDICATOR_BOTH:
+-                set_indicator_on_side(0x00, 0x80, 0x80);
++                set_indicator_on_side(CAPS_INDICATOR_RGB);
+                 break;
+             case CAPS_INDICATOR_UNDER_KEY:
+             case CAPS_INDICATOR_OFF:
 @@ -770,6 +774,14 @@ void side_led_show(void) {
          return;
      }

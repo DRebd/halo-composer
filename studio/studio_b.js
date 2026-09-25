@@ -2,10 +2,10 @@
 // -------------------------------------------------------------------- state
 const LS_KEY = 'halo-studio/v1';
 const state = {
-  scene: baseScene(),
-  zoneNames: ['Keys', 'WASD', 'Halo', 'Zone 4', 'Zone 5', 'Zone 6', 'Zone 7', 'Zone 8'],
+  scene: HC.defaultScene(GEOM),
+  zoneNames: ['Keys', 'Zone 2', 'Halo', 'Zone 4', 'Zone 5', 'Zone 6', 'Zone 7', 'Zone 8'],
   sel: new Set(),
-  color: [255, 200, 140],
+  color: [255, 167, 87],
   zone: 0,
   grad: 0,
   tool: 'select',

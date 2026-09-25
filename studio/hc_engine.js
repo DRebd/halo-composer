@@ -353,19 +353,21 @@
           scaleRgb(c, lo + scale8(e, rng)); break;
         }
         case FX.RIPPLE: {
-          const life = 1500, xy = this.ledXY(s, led, this._xy), w = (z.p1 >> 3) + 2;
+          const life = 1500, xy = this.ledXY(s, led, this._xy), w = (z.p1 >> 3) + 2, reach = z.p2 >= 2 ? z.p2 : 0;
           let e = 0;
           for (const h of this.hits) {
             if (h.led === 0xFF) continue;
             const age = (t - h.t) >>> 0;
             if (age >= life) continue;
             const r = Math.floor((age * (16 + (z.speed >> 1))) / 256);
-            const dx = xy[0] - h.x, dy = xy[1] - h.y;
-            const dist = isqrt32(dx * dx + dy * dy);
+            let fade;
+            if (reach) { if (r >= reach) continue; fade = 255 - Math.floor((r * 255) / reach); } else fade = 255 - Math.floor((age * 255) / life);
+            const dx = xy[0] - h.x, dy = xy[1] - h.y; // rows weighted 1.5x, as in the C engine
+            const dist = isqrt32(dx * dx + Math.floor((dy * dy * 9) / 4));
             const dd = Math.abs(dist - r);
             if (dd >= w) continue;
             const ring = Math.floor(((w - dd) * 255) / w) & 0xFF;
-            const f = scale8(ring, 255 - Math.floor((age * 255) / life));
+            const f = scale8(ring, fade);
             if (f > e) e = f;
           }
           accentOf(); scaleRgb(c, lo); scaleRgb(acc, hi); lerpRgb(c, acc, e); break;
@@ -432,14 +434,15 @@
   }
 
   function defaultScene(geom) {
+    // Mirrors hc_scene_defaults(): 2700K keys with a 560 ms mint flash + a two-key mint ripple on
+    // keypress, 2700K halo breathing 30-100%, gamma on.
     const s = blankScene();
-    for (let i = 0; i < LED_COUNT; i++) { s.color[i * 3] = 255; s.color[i * 3 + 1] = 200; s.color[i * 3 + 2] = 140; s.zoneOf[i] = i < KEY_LEDS ? 0 : 2; }
-    for (const i of [33, 47, 48, 49]) { s.color[i * 3] = 255; s.color[i * 3 + 1] = 170; s.color[i * 3 + 2] = 70; s.zoneOf[i] = 1; }
-    for (let i = KEY_LEDS; i < LED_COUNT; i++) { s.color[i * 3] = 255; s.color[i * 3 + 1] = 100; s.color[i * 3 + 2] = 16; }
+    s.flags = SF.GAMMA;
+    for (let i = 0; i < LED_COUNT; i++) { s.color[i * 3] = 255; s.color[i * 3 + 1] = 167; s.color[i * 3 + 2] = 87; s.zoneOf[i] = i < KEY_LEDS ? 0 : 2; }
     const mk = (effect, source, speed, lo, hi) => Object.assign(blankZone(), { effect, source, speed, vMin: lo, vMax: hi });
-    s.zones[0] = mk(FX.STATIC, SRC.MAP, 128, 0, 255);
-    s.zones[1] = mk(FX.STATIC, SRC.MAP, 128, 0, 200);
-    s.zones[2] = Object.assign(mk(FX.BREATHE, SRC.ZONE, 40, 128, 255), { axis: AXIS.NONE, spread: 0, color: [255, 100, 16] });
+    s.zones[0] = Object.assign(mk(FX.RIPPLE, SRC.MAP, 56, 255, 255), { p1: 80, p2: 24, reactive: RX.FLASH | (12 << 4), color: [0x70, 0xFF, 0x94], rxColor: [0x70, 0xFF, 0x94] });
+    s.zones[1] = mk(FX.STATIC, SRC.MAP, 128, 0, 255);
+    s.zones[2] = Object.assign(mk(FX.BREATHE, SRC.ZONE, 40, 77, 255), { axis: AXIS.NONE, spread: 0, color: [255, 167, 87] });
     for (let i = 3; i < ZONES; i++) s.zones[i] = mk(FX.STATIC, SRC.MAP, 128, 0, 255);
     const g = (flags, stops) => { const G = blankGradient(); G.count = stops.length; G.flags = flags; stops.forEach((st, i) => { G.stops[i] = { pos: st[0], r: st[1], g: st[2], b: st[3] }; }); return G; };
     s.grad[0] = g(0, [[0, 255, 60, 0], [128, 255, 0, 90], [255, 90, 0, 255]]);
