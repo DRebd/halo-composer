@@ -93,6 +93,8 @@ Stages 1–3 passed on your keyboard. Only the day-long battery comparison is st
 - [ ] In VIA, with the new `dist\halo75v2_composer_via3.json`, the Fn+Enter key shows as "Composer On/Off", and Fn+Ins shows as "Toggle Power On Animation".
 - [ ] Claude Code: `python tools\halo_kb.py selftest`.
 
+**Stage 4 result (2026-09-25):** passed. You confirmed the look, Fn+Enter, Caps Lock and VIA. Claude Code read Fn+Enter = `HC_TOGGLE` (0x7E2D) on both Fn layers and 1,485 bytes of macro space from the keyboard; self-test 27/27 at 40 fps. These are the files to publish as the first tagged release.
+
 ## Part 4: going back to NuPhy's original firmware
 
 Flash `QMK_firmware_nuphy_halo75_v2_ansi_v2.1.5.bin` using Part 2. Then load NuPhy's VIA definition (`nuphy-halo75-v2-via.json`, in your Downloads) in VIA as before. The halo shortcuts in [USER_GUIDE.md](USER_GUIDE.md#keyboard-shortcuts) that are marked *stock* apply again.

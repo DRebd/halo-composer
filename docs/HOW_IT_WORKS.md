@@ -14,7 +14,7 @@ A technical reference for the firmware engine, the USB protocol, the scene forma
 | Raw HID | 32-byte reports, **USB only**. The wireless module carries only keyboard, mouse and consumer reports | `rf_protocol.h` |
 | Flash use | `via` build 74,328 B · `composer` build 83,120 B (GCC 15.2) | `scripts/build-firmware.ps1` |
 | RAM | Fixed stacks: 1 KB main + 2 KB process. Free heap (unused headroom): `via` 2,616 B, `composer` 1,496 B. The scene takes 915 B and the engine state about 190 B | `scripts/mem_report.sh` |
-| EEPROM (QMK's *legacy* emulated EEPROM: 4 KB kept in 8 KB of flash, plus a 4 KB copy in RAM) | VIA custom block = NuPhy's 23-byte config + the **915-byte scene**. VIA's macro space shrinks from 2,400 B (ryodeushii's build) to 1,485 B. Both are computed from the source; NuPhy's stock 2.1.5 reported 2,411 B with a different layout. Details in [RESEARCH_PRESETS_AND_SLOTS.md](RESEARCH_PRESETS_AND_SLOTS.md#2-route-b-several-scenes-on-the-keyboard) | `firmware/keymap/config.h` |
+| EEPROM (QMK's *legacy* emulated EEPROM: 4 KB kept in 8 KB of flash, plus a 4 KB copy in RAM) | VIA custom block = NuPhy's 23-byte config + the **915-byte scene**. VIA's macro space shrinks from 2,400 B (ryodeushii's build, computed) to 1,485 B (computed, and confirmed on the keyboard 2026-09-25); NuPhy's stock 2.1.5 reported 2,411 B with a different layout. Details in [RESEARCH_PRESETS_AND_SLOTS.md](RESEARCH_PRESETS_AND_SLOTS.md#2-route-b-several-scenes-on-the-keyboard) | `firmware/keymap/config.h` |
 
 ## Architecture
 

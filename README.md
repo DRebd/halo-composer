@@ -63,7 +63,7 @@ The editor only talks to the keyboard over the **USB cable in wired mode**. The 
 | `docs/` | Everything above |
 | `chat-handoff/HALO_COMPOSER.md` | The original design document from the claude.ai conversation (historical) |
 
-Firmware files are built automatically on every change and can be downloaded from the latest run on the [Actions tab](https://github.com/DRebd/halo-composer/actions). They're labelled *UNTESTED-on-hardware* because each automatic build is new; tested files will be attached to tagged releases.
+Firmware files are built automatically on every change and can be downloaded from the latest run on the [Actions tab](https://github.com/DRebd/halo-composer/actions). They're labelled *UNTESTED-on-hardware* because each automatic build is new. Files that passed the checklist on a real keyboard will be attached to tagged releases on the [Releases page](https://github.com/DRebd/halo-composer/releases).
 
 ## Credits and license
 

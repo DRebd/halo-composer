@@ -153,5 +153,5 @@ For NuPhy's **stock** firmware shortcuts, see the cheat sheet the original conve
 
 - **USB only for editing.** Studio and VIA need the cable in wired mode. Saved lighting runs in every mode.
 - **One editor at a time.** VIA and Studio (or two Studio tabs) at once confuse each other. Close one.
-- **Macro space** in VIA is 1,485 bytes with Composer (2,400 in ryodeushii's plain build; both computed from the source), because the scene uses that space.
+- **Macro space** in VIA is 1,485 bytes with Composer (read from your keyboard; ryodeushii's plain build has 2,400), because the scene uses that space.
 - **Firmware updates** reset saved settings when you enter flashing mode with Esc. Back up the scene first ([FLASHING.md, Part 5](FLASHING.md#part-5-updating-composer-later)).

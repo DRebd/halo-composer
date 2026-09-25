@@ -208,7 +208,7 @@ The "about 45 KB unused" figure counts the EEPROM's 8 KB as free.
 
 ## 6. What we'd need to verify on the hardware
 
-- The macro size the Composer firmware reports. Expected: 1,485 B. Read it with `halo_kb.py`'s read-only backup, when talking to the keyboard is allowed.
+- ~~The macro size the Composer firmware reports. Expected: 1,485 B.~~ **Confirmed 1,485 B** on the keyboard (2026-09-25).
 - How long an `HC_SAVE` freezes the keyboard today, and whether typing, USB or 2.4 GHz glitch during an EEPROM compaction or a flash page erase.
 - Stack high-water mark during a save; add a `GET_STATS` field for it.
 - That QMK Toolbox re-flashing and the Esc-hold wipe leave a test page in the free flash untouched.

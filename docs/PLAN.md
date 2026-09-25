@@ -8,7 +8,7 @@
 - Claude Code found and fixed **one serious firmware hazard** (keys could read leftover data after switching firmware) and **12 bugs in the editor**. Three of those could corrupt what gets saved to the keyboard or wipe the halo calibration. Every fix has an automated test that fails on the original code and passes now.
 - It's packaged as a public repo with one-command builds and tests, automatic builds on GitHub, and the editor hosted at **https://drebd.github.io/halo-composer/**.
 - **Hardware bring-up passed on 2026-09-25** ([results](FLASHING.md#results-2026-09-25)). Only the day-long battery comparison is still open.
-- Your notes from that session are in the **2026-09-25 update**: Fn+Enter, magenta Caps Lock, the new default look, the Ripple reach setting and Studio fixes. It needs one more flash ([Stage 4](FLASHING.md#stage-4-after-flashing-the-2026-09-25-update)).
+- Your notes from that session are in the **2026-09-25 update**: Fn+Enter, magenta Caps Lock, the new default look, the Ripple reach setting and Studio fixes. It passed on the keyboard ([Stage 4](FLASHING.md#stage-4-after-flashing-the-2026-09-25-update)) and is ready to publish as the first release.
 - The hardware condition you set for roadmap features is now met. None have been started.
 
 ## Where this came from
@@ -78,14 +78,14 @@ Run everything locally with `.\scripts\test.ps1` (Docker needed). The same tests
 | Firmware builds: `via` (fallback) and `composer` | 74,328 and 83,192 bytes |
 | RAM headroom (composer) | 1,496 bytes free heap |
 
-**On the physical keyboard:** checklist Stages 1–3 passed on 2026-09-25 with the previous build, including a 27/27 self-test. Stage 4 covers the 2026-09-25 update: [FLASHING.md](FLASHING.md#part-3-bring-up-checklist).
+**On the physical keyboard:** checklist Stages 1–4 passed on 2026-09-25 (self-test 27/27 on both builds). Stage 4 covered the 2026-09-25 update: [FLASHING.md](FLASHING.md#part-3-bring-up-checklist).
 
 ## What's left
 
 1. ~~Hardware session~~: done 2026-09-25 (Stages 1–3).
 2. ~~Feed the calibrated halo positions into `tools/gen_geometry.py`~~: done.
-3. Flash the 2026-09-25 update and tick [Stage 4](FLASHING.md#stage-4-after-flashing-the-2026-09-25-update).
-4. Tag a first release on GitHub with the `.bin` files that passed Stage 4.
+3. ~~Flash the 2026-09-25 update and tick Stage 4~~: passed 2026-09-25.
+4. Tag a first release on GitHub with the `.bin` files that passed Stage 4 (ready; waiting for your go-ahead).
 5. The day-long battery comparison.
 6. Roadmap features (below), when you want them.
 
