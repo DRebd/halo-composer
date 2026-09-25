@@ -4,11 +4,11 @@ Halo Studio is the editor for the Halo Composer firmware. Open it in **desktop C
 
 **https://drebd.github.io/halo-composer/**
 
-You can design without a keyboard: the animated preview uses the same math as the firmware, so what you see is what the keyboard will show. Connecting sends your design to the keyboard live.
+You can design without a keyboard: the animated preview uses the same math as the firmware, so what you see is what the keyboard will show. The preview also converts LED values into how the eye sees them, so whites and dim colors look on screen roughly as they do on the keys. Screens and LEDs differ, so treat it as close rather than exact. Connecting sends your design to the keyboard live.
 
 ## Quick start: the look you asked for
 
-Your original goal was warm-white keys, WASD a slightly different shade, and an amber halo breathing between 50% and 100%. That's the **factory default** of the Composer firmware (the starter scene **Warm Desk**), and Composer is the effect the keyboard starts with after flashing. If you've switched to a stock effect, **Fn+Shift+←** (or Device → Turn Composer on) brings it back. Everything below is for making it your own.
+The **factory default** of the Composer firmware (the starter scene **Warm Desk**) is the look you picked on 2026-09-25: 2700K warm-white keys; the key you press flashes mint (#70FF94) for about half a second and sends a mint ripple about two keys outwards; a 2700K halo breathing between 30% and 100%. It uses *Match screen colors*, so the keys show colors the way your monitor does. Composer is the effect the keyboard starts with after flashing. If you've switched to a stock effect, press **Fn+Enter** to jump back (press it again to return to the stock effect), or use Device → Turn Composer on. Everything below is for making it your own.
 
 ## Connecting
 
@@ -97,9 +97,9 @@ Every effect animates *your* colors instead of replacing them. The Effects tab s
 
 ### Halo setup (calibration)
 
-NuPhy doesn't publish where the 45 halo LEDs sit, so the starting layout is an educated guess. Calibrating once makes waves, comets and ripples line up with your real keyboard:
+NuPhy doesn't publish where the halo LEDs sit. The built-in layout was measured on your Halo75 V2 on 2026-09-25, so you only need this if waves, comets or ripples don't line up. Of the 45 halo channels, LEDs 9, 10 and 45 have no LED fitted: Studio hides them, calibration skips them, and ring effects ignore them.
 
-1. Connect and turn Composer on.
+1. Connect the keyboard. Composer has to be the running effect; if it isn't, press **Fn+Enter**.
 2. **Start placing**: the keyboard goes dark except one amber halo LED. Click where it is on the drawing. The next one lights up automatically. **Skip** any you can't see.
 3. **Walk the ring** lights them in order. Check it goes smoothly around.
 4. **Save to keyboard.**
@@ -109,7 +109,7 @@ The calibration is part of the saved scene. To keep it through a firmware update
 ### Device
 
 - Composer on/off, **Read from keyboard**, **Push editor to keyboard**, and **Factory scene** (loads the default look but keeps your calibration).
-- **Perceptual brightness (gamma 2.2)**: makes low brightness steps look even.
+- **Match screen colors (perceptual brightness)**: the keys show colors and brightness levels the way your screen does. The factory look uses it. With it off, the LEDs get raw values, which look whiter and brighter than on screen (the reason the first default looked too white).
 - **Halo follows key brightness**: use Fn+↑/↓ for everything instead of Fn+M+↑/↓ for the halo.
 - **Measure keyboard frame rate** (should be ≥ 25 fps) and a log of USB messages, useful when reporting problems.
 
@@ -121,7 +121,8 @@ These apply to the Composer firmware, which uses ryodeushii's layout (the same k
 
 | Keys | Composer on | Stock effects / halo modes |
 |---|---|---|
-| Fn + ← (with Shift: backwards) | Next lighting effect. Composer is the **last** one, so Fn+Shift+← from the first stock effect jumps to it | same |
+| Fn + Enter | **Jump to Composer**, or back to the stock effect you were on | same |
+| Fn + ← (with Shift: backwards) | Next (previous) lighting effect. There are 43; Composer is the **last** | same |
 | Fn + ↑ / ↓ | **Key** brightness (Composer's master for keys) | same |
 | Fn + → | no effect on Composer | hue of stock effects |
 | Fn + , / . | no effect (each zone has its own speed) | speed of stock effects |
@@ -141,7 +142,7 @@ These apply to the Composer firmware, which uses ryodeushii's layout (the same k
 | Fn + O | Deep-sleep on/off · **Fn + P**: sleep while on USB on/off |
 | Fn + Y / U / I | Key-press debounce shorter / show / longer (advanced; fixes chatter) |
 | Fn + H / J / K | Key-release debounce shorter / show / longer |
-| Fn + Caps Lock | Change where the Caps Lock indicator shows |
+| Fn + Caps Lock | Change where the Caps Lock indicator shows: status bar, Caps key, both (the default), or off. It's magenta, so it doesn't look like the red low-battery warning |
 | Fn + Insert | Power-on halo animation on/off |
 | Fn + [ (hold 3 s) | **Factory reset**: lighting, VIA key changes, pairings, and the Composer scene |
 | PrtSc / Fn + PrtSc | Mac: area / full screenshot · Win: Snipping Tool / Print Screen |
@@ -152,5 +153,5 @@ For NuPhy's **stock** firmware shortcuts, see the cheat sheet the original conve
 
 - **USB only for editing.** Studio and VIA need the cable in wired mode. Saved lighting runs in every mode.
 - **One editor at a time.** VIA and Studio (or two Studio tabs) at once confuse each other. Close one.
-- **Macro space** in VIA is about 1.5 KB with Composer (it was about 2.4 KB), because the scene uses that space.
+- **Macro space** in VIA is 1,485 bytes with Composer (2,400 in ryodeushii's plain build; both computed from the source), because the scene uses that space.
 - **Firmware updates** reset saved settings when you enter flashing mode with Esc. Back up the scene first ([FLASHING.md, Part 5](FLASHING.md#part-5-updating-composer-later)).

@@ -9,12 +9,12 @@ A technical reference for the firmware engine, the USB protocol, the scene forma
 | MCU (the keyboard's processor) | STM32F072: Cortex-M0 at 48 MHz, **no floating point, no hardware divide**, 128 KB flash, 16 KB RAM | ryodeushii tree |
 | LED drivers | 2 × IS31FL3733 (I²C 0x50/0x53 at 1 MHz), 64 RGB LEDs each, 8-bit PWM | `keyboards/nuphy/halo75v2/ansi/config.h` |
 | LEDs | 0–82 per-key; **83–127 "halo" (45)**: 83–87 status bar, 88–127 underglow ring and badge | `side.c` |
-| Halo physical positions | **Inferred, not measured.** Front edge 19, left 7, back 7, badge 2, right 5, status bar 5 (see `tools/gen_geometry.py`). Fixed by the calibration wizard | derived from NuPhy's power-on order and group masks |
-| Frame pacing | QMK RGB matrix: flush every 25 ms (~40 fps), rendering split across main-loop passes | `keyboard.json` |
+| Halo physical positions | **Measured** on a real Halo75 V2 with the calibration wizard (2026-09-25) and built into the defaults. LEDs 9, 10 and 45 (indices 91, 92, 127) have no LED fitted: Studio hides them and ring order ignores them | `tools/gen_geometry.py` (`CALIBRATED`, `ABSENT`) |
+| Frame pacing | QMK RGB matrix: flush every 25 ms (~40 fps), rendering split across main-loop passes. Measured on the keyboard: 40 fps; 30 fps with ripples under 31 simulated key presses per second | `keyboard.json`, `halo_kb.py status` |
 | Raw HID | 32-byte reports, **USB only**. The wireless module carries only keyboard, mouse and consumer reports | `rf_protocol.h` |
 | Flash use | `via` build 74,328 B · `composer` build 83,120 B (GCC 15.2) | `scripts/build-firmware.ps1` |
 | RAM | Fixed stacks: 1 KB main + 2 KB process. Free heap (unused headroom): `via` 2,616 B, `composer` 1,496 B. The scene takes 915 B and the engine state about 190 B | `scripts/mem_report.sh` |
-| EEPROM (emulated in flash) | VIA custom block = NuPhy's 23-byte config + the **915-byte scene**. VIA's macro space shrinks from 2,411 B to about 1.5 KB | `firmware/keymap/config.h` |
+| EEPROM (QMK's *legacy* emulated EEPROM: 4 KB kept in 8 KB of flash, plus a 4 KB copy in RAM) | VIA custom block = NuPhy's 23-byte config + the **915-byte scene**. VIA's macro space shrinks from 2,400 B (ryodeushii's build) to 1,485 B. Both are computed from the source; NuPhy's stock 2.1.5 reported 2,411 B with a different layout. Details in [RESEARCH_PRESETS_AND_SLOTS.md](RESEARCH_PRESETS_AND_SLOTS.md#2-route-b-several-scenes-on-the-keyboard) | `firmware/keymap/config.h` |
 
 ## Architecture
 
@@ -46,7 +46,7 @@ flowchart LR
 2. **Base color from the zone's source:** painted per-LED RGB, the zone color, a 1–6 stop gradient sampled along an axis (optionally scrolling), or a rainbow.
 3. **The effect modulates that color.** Most effects only change brightness between the zone's `v_min` and `v_max`, so painted palettes survive every effect. Hue effects rotate each LED's *own* hue. Sparkle, Raindrops, Ripple and Heatmap blend toward an accent color.
 4. **Keypress overlay** (per zone): flash, glow, ripple, or halo echo.
-5. **Master brightness.** Keys use QMK's global value (Fn+↑/↓). The halo uses NuPhy's halo level (Fn+M+↑/↓, 6 steps), or optionally follows the keys. Optional gamma 2.2.
+5. **Master brightness.** Keys use QMK's global value (Fn+↑/↓). The halo uses NuPhy's halo level (Fn+M+↑/↓, 6 steps), or optionally follows the keys. Optional gamma 2.2 (Studio: *Match screen colors*), which the factory look uses.
 6. **Indicators** (battery, caps, OS, wireless) are drawn on top from the RGB-matrix indicator callback, so they never flicker against the effect. They're suppressed while the calibration wizard lights single LEDs.
 
 **Design rules:**
@@ -59,8 +59,9 @@ flowchart LR
 
 | Where | Change |
 |---|---|
-| `keyboards/nuphy/halo75v2/ansi/keymaps/composer/` (from `firmware/keymap/`) | New keymap: the same layers as `default` (it `#include`s it), a 128-LED `g_led_config` in QMK's 224×64 coordinate space, and the three RGB-matrix user effects (`game_mode`, `position_mode`, `composer`). Halo LEDs carry flag `NONE`, so stock effects keep leaving them to NuPhy's halo engine. |
+| `keyboards/nuphy/halo75v2/ansi/keymaps/composer/` (from `firmware/keymap/`) | New keymap: a copy of `default`'s layers plus `HC_TOGGLE` on Fn+Enter (jump to Composer and back; its keycode is the one after ryodeushii's last custom keycode, checked by `make_via_json.py`), a 128-LED `g_led_config` in QMK's 224×64 coordinate space, and the three RGB-matrix user effects (`game_mode`, `position_mode`, `composer`). Halo LEDs carry flag `NONE`, so stock effects keep leaving them to NuPhy's halo engine. |
 | `side.c` (+26 lines, under `#ifdef HALO_COMPOSER_ENABLE`) | `side_led_show()` returns early while Composer is active, *after* NuPhy's power-on sweep has had its turn. Adds `side_composer_overlay()` (battery + indicators) and `side_power_show_active()`. |
+| `common/config/config.h`, `common/core/keyboard.c`, `side.c` | The Caps Lock indicator colour becomes `CAPS_INDICATOR_RGB` (default: ryodeushii's teal). The Composer keymap sets magenta and `DEFAULT_CAPS_INDICATOR_TYPE` = both (status bar and Caps key). |
 | `common/config/config.c` (+7 lines) | Weak `nuphy_leds_need_power()` (default `false`, so no change for other keymaps). Composer returns true while the halo is lit, so turning key brightness to 0 no longer cuts power to both LED drivers. |
 
 ### EEPROM layout guard (added 2026-09-24)
@@ -124,7 +125,7 @@ Changing this layout means bumping `HC_SCENE_VERSION`, updating `SCENE_BYTES` in
 | 11 | Comet | tail length | count 1–8 |
 | 12 | Strobe | duty | – |
 | 13 | Reactive fade (speed = fade length 0.15–3.2 s) | – | – |
-| 14 | Ripple | ring width | – |
+| 14 | Ripple (rings are round on the real board: rows weighted 1.5×) | ring width | reach in units (12 = one key); 0–1 = whole board |
 | 15 | Heatmap (cools over ~10 s) | – | – |
 | 16 | Off | – | – |
 

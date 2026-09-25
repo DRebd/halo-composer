@@ -35,8 +35,8 @@ A community maintainer's rework of NuPhy's own QMK source. It's the same keyboar
 - **Effects keep your colors.** 17 effects (breathe, heartbeat, wave, candle, comet, ripple, sparkle, heatmap, ...) animate the colors you painted instead of replacing them with one color.
 - **Up to 8 zones**, each with its own effect, speed and **brightness floor and ceiling**. So "WASD breathes fast while the halo breathes slowly between 50% and 100%" is simply two zones.
 - **Gradients and reactions.** Four gradients of up to 6 colors each, plus rainbow sources. Keypress reactions (flash, glow, ripple, or *halo echo*, which lights the halo next to the key you pressed) can go on any zone.
-- **Your look out of the box:** warm-white keys, deeper-toned WASD, and an amber halo breathing 50–100%. It's the default right after flashing.
-- **Keeps what works.** Fn+↑/↓ still sets key brightness and Fn+M+↑/↓ still sets halo brightness. The battery, caps and wireless indicators draw on top. NuPhy's boot animation still plays. VIA still remaps keys, and every ryodeushii feature above is untouched. Stock effects are one Fn+← away.
+- **Your look out of the box:** 2700K warm-white keys; the key you press flashes mint (#70FF94) for about half a second and sends a mint ripple about two keys outwards; a 2700K halo breathing between 30% and 100%. It's the default right after flashing, and **Fn+Enter** jumps back to it from any stock effect.
+- **Keeps what works.** Fn+↑/↓ still sets key brightness and Fn+M+↑/↓ still sets halo brightness. The battery, caps and wireless indicators draw on top; Caps Lock is magenta, on both the key and the status bar. NuPhy's boot animation still plays. VIA still remaps keys, and every ryodeushii feature above is untouched. Stock effects are one Fn+← away.
 - **Fixes a stock quirk:** turning key brightness to 0 no longer switches the halo off too.
 - **Halo Studio**, at https://drebd.github.io/halo-composer/, with nothing to install:
   - a live animated preview that uses the *same math* as the keyboard, so what you see is what you get;
@@ -49,4 +49,4 @@ A community maintainer's rework of NuPhy's own QMK source. It's the same keyboar
   - Studio recognizes keyboards without Composer instead of just timing out.
   - A command-line tool does backups, self-tests and scene backup/restore.
   - Automated tests (firmware-vs-preview parity, protocol, browser end to end) run on every change.
-- **Costs:** VIA macro space drops from about 2.4 KB to about 1.5 KB (you use none), and free RAM on the keyboard drops from about 2.6 KB to 1.5 KB. Editing works over USB only; saved lighting runs in every mode.
+- **Costs:** VIA macro space drops from 2,400 to 1,485 bytes (you use none), and free RAM on the keyboard drops from about 2.6 KB to 1.5 KB. Editing works over USB only; saved lighting runs in every mode.

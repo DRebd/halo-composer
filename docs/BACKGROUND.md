@@ -47,7 +47,8 @@ The Halo75 V2 really does run QMK. NuPhy publishes GPL source, and VIA really do
 | Idea | Why | Feasibility on the STM32F072 |
 |---|---|---|
 | **White balance per group** (key vs halo RGB gains) | The halo diffuser tints light differently from keycaps, so "warm white" should match everywhere | Trivial: 6 bytes and 3 multiplies |
-| **Several stored scenes on Fn+M+1…4** | Switch looks without the editor | EEPROM-bound: each extra full scene costs 915 B of macro space. Options: cap VIA layers at 6 (frees 408 B) or a palette-indexed scene (~300 B) |
+| **Several stored scenes on Cmd+Fn+1…8** | Switch looks without the editor | Studied in [RESEARCH_PRESETS_AND_SLOTS.md](RESEARCH_PRESETS_AND_SLOTS.md): best as a small store in unused flash (8 full scenes in 10 KB, survives firmware updates). The EEPROM only fits 2 |
+| **Battery gauge on the function row** (your idea, 2026-09-25) | When Fn+\ shows the battery, Esc…F12 light up as a bar proportional to the charge, colored by level: e.g. 50% lights Esc to about F6 in yellow, 80% Esc to about F10 in green | Cheap: 13 keys ≈ 7.7% each; draw in the indicator overlay from NuPhy's battery reading |
 | **Layer-aware lighting** | Hold Fn and the keys that do something glow while the rest dim | Cheap: read `layer_state` in the overlay |
 | **WPM-reactive** | Typing speed drives hue or brightness | QMK `WPM_ENABLE`; cheap |
 | **Value meters** | CPU, volume or download progress as a bar on the number row or halo, fed by a tiny host script | New effect + a 1-byte command |

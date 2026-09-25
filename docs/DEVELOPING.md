@@ -61,8 +61,8 @@ python tools\halo_kb.py scene-restore backups\scene.halo.json --save
 | Lighting math in `firmware/keymap/composer/hc_engine.c` | Make the identical change in `studio/hc_engine.js`, then run the tests (parity will tell you) |
 | The scene layout (`hc_scene_t`) | Bump `HC_SCENE_VERSION`; update the size in the `_Static_assert` (`hc_qmk.c`), `SCENE_BYTES`/offsets in `studio/hc_engine.js`, and offsets in `tools/halo_protocol.py`. The boot guard will reset VIA storage on first boot of the new version; that's expected |
 | The protocol (`hc_protocol.h`, `hc_qmk.c`) | Update `studio/studio_b.js` (`SUB`, `readScene`, `sendDirty`), `tools/halo_protocol.py`, `tools/composer_checks.py` |
-| Key or halo positions | Edit `tools/gen_geometry.py` and run it (it rewrites `hc_board_geometry.c` and `studio/geometry.json`), then update the points in `keymap.c` (`python tools/gen_geometry.py points`) |
-| The ryodeushii base commit | Update `QMK_COMMIT` in `firmware/base.env`, rebuild, and check that `nuphy-shared.diff` still applies and that `side_led_show()` still has the same shape |
+| Key or halo positions | Edit `tools/gen_geometry.py` (`CALIBRATED`, `ABSENT`) and run it (it rewrites `firmware/keymap/composer/hc_board_geometry.c` and `studio/geometry.json`), then update the points in `keymap.c` (`python tools/gen_geometry.py points`). Ring order uses the same maths as Studio's *Recompute ring order* |
+| The ryodeushii base commit | Update `QMK_COMMIT` in `firmware/base.env`, rebuild, and check that `nuphy-shared.diff` still applies and that `side_led_show()` still has the same shape. `keymap.c` carries a copy of `keymaps/default/keymap.c`'s layers: re-copy them if upstream changed. `make_via_json.py` fails if ryodeushii's custom keycode list changed, since `HC_TOGGLE` must be the next one |
 | The RGB-matrix effect list | The static assert in `keymap.c` requires Composer to be mode 43 (VIA dropdown index). Update `tools/make_via_json.py` together with it |
 
 ## Repository conventions

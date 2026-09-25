@@ -1,14 +1,15 @@
 # Plan, assessment and status
 
-*Last updated 2026-09-24.* This records what the original claude.ai conversation proposed, what Claude Code checked, what changed and why, what's verified, and what's left.
+*Last updated 2026-09-25.* This records what the original claude.ai conversation proposed, what Claude Code checked, what changed and why, what's verified, and what's left.
 
 ## TL;DR
 
 - The design from the chat **held up**. Its firmware builds, its lighting math matches the editor exactly, and its protocol works end to end against the real firmware code running as a simulated keyboard.
 - Claude Code found and fixed **one serious firmware hazard** (keys could read leftover data after switching firmware) and **12 bugs in the editor**. Three of those could corrupt what gets saved to the keyboard or wipe the halo calibration. Every fix has an automated test that fails on the original code and passes now.
 - It's packaged as a public repo with one-command builds and tests, automatic builds on GitHub, and the editor hosted at **https://drebd.github.io/halo-composer/**.
-- **Not done yet:** flashing and testing on the physical keyboard. That needs you at the keyboard for about 20 minutes: [FLASHING.md](FLASHING.md).
-- Roadmap features (white balance, layer-aware lighting, multiple saved scenes, ...) are **on hold until the current features pass on real hardware**, as you asked.
+- **Hardware bring-up passed on 2026-09-25** ([results](FLASHING.md#results-2026-09-25)). Only the day-long battery comparison is still open.
+- Your notes from that session are in the **2026-09-25 update**: Fn+Enter, magenta Caps Lock, the new default look, the Ripple reach setting and Studio fixes. It needs one more flash ([Stage 4](FLASHING.md#stage-4-after-flashing-the-2026-09-25-update)).
+- The hardware condition you set for roadmap features is now met. None have been started.
 
 ## Where this came from
 
@@ -59,10 +60,10 @@ The chat's transcript, its three output files and the lighting cheat-sheet page 
 
 ### From the chat, but not verifiable without the keyboard
 
-- **Where the 45 halo LEDs physically sit** was inferred from NuPhy's code. The calibration wizard fixes it in a few minutes, and the positions are then saved on the keyboard.
+- ~~Where the 45 halo LEDs physically sit~~: **measured 2026-09-25** with the calibration wizard and built into the defaults. LEDs 9, 10 and 45 have no LED fitted.
 - ~~Hardware recovery button under the Caps Lock keycap~~: **now confirmed** by ryodeushii's readme and recovery instructions (remove the Caps Lock keycap and hold the small button beside the switch while plugging in). NuPhy's own page only describes Esc-hold.
 - **Two unexplained NuPhy keycodes** on Fn+M+R and Fn+M+T in your stock firmware (confirmed in your backup as custom keycodes #23 and #24). They exist in neither NuPhy's nor ryodeushii's source, so they disappear after flashing. NuPhy doesn't document what they do.
-- **Frame rate on the 48 MHz chip**: estimated ≤13 ms per frame worst case. It gets measured in the bring-up.
+- ~~Frame rate on the 48 MHz chip~~: **measured 2026-09-25**. 40 fps (the firmware's ceiling), and 30 fps with ripples under 31 simulated key presses per second.
 
 ## Verification
 
@@ -72,24 +73,21 @@ Run everything locally with `.\scripts\test.ps1` (Docker needed). The same tests
 |---|---|
 | Engine compiles with `-Wall -Wextra -Wconversion -Wshadow -Werror` | pass |
 | C ↔ JS parity: 80 scenes, 3,200 frames × 128 LEDs, sin/hsv/atan2/isqrt vectors | byte-identical |
-| Protocol checks vs a simulated keyboard (the real `hc_qmk.c` built for the PC) | 41/41 |
-| Studio end to end in headless Chrome vs that simulated keyboard (292 USB packets) | 16/16 |
-| Firmware builds: `via` (fallback) and `composer` | 74,328 and 83,120 bytes |
+| Protocol checks vs a simulated keyboard (the real `hc_qmk.c` built for the PC) | 43/43 |
+| Studio end to end in headless Chrome vs that simulated keyboard | 18/18 |
+| Firmware builds: `via` (fallback) and `composer` | 74,328 and 83,192 bytes |
 | RAM headroom (composer) | 1,496 bytes free heap |
 
-**Not verified:** anything on the physical keyboard. See the checklist in [FLASHING.md](FLASHING.md#part-3-bring-up-checklist).
+**On the physical keyboard:** checklist Stages 1–3 passed on 2026-09-25 with the previous build, including a 27/27 self-test. Stage 4 covers the 2026-09-25 update: [FLASHING.md](FLASHING.md#part-3-bring-up-checklist).
 
 ## What's left
 
-1. **Hardware session with you** ([FLASHING.md](FLASHING.md)):
-   - Install QMK Toolbox (one admin prompt for drivers).
-   - Flash `via` and check the basics.
-   - Flash `composer` and work through the checklist.
-   - Calibrate the halo.
-   - Measure the frame rate.
-2. Feed the calibrated halo positions back into `tools/gen_geometry.py`, so the defaults are right for everyone.
-3. Tag a first release on GitHub with the tested `.bin` files.
-4. Then, and only then, roadmap features (below).
+1. ~~Hardware session~~: done 2026-09-25 (Stages 1–3).
+2. ~~Feed the calibrated halo positions into `tools/gen_geometry.py`~~: done.
+3. Flash the 2026-09-25 update and tick [Stage 4](FLASHING.md#stage-4-after-flashing-the-2026-09-25-update).
+4. Tag a first release on GitHub with the `.bin` files that passed Stage 4.
+5. The day-long battery comparison.
+6. Roadmap features (below), when you want them.
 
 ## Risks and open questions
 
@@ -99,17 +97,18 @@ Run everything locally with `.\scripts\test.ps1` (Docker needed). The same tests
 | Unreleased ryodeushii base misbehaves (wireless, sleep, battery) | Daily annoyance | Stage 1 of the flash tests his code alone. The last public release (ryo-1.1.4, Sep 2024) could be a fallback base: the engine is portable, but the hooks would need adapting. |
 | Lighting too slow on the M0 chip with heavy scenes (ripples + 8 recent key presses) | Laggy animation, or in the worst case typing latency | Measure with `halo_kb.py selftest`. Rendering is spread over 32 small slices per frame, and the engine can cache per-LED geometry if needed. |
 | Battery life with the halo always lit | Shorter wireless use | Compare against stock over a day (checklist item). |
-| Macro space drops from 2,411 to about 1,500 bytes | Fewer or shorter VIA macros | You use none today. |
-| Each Esc-held flash wipes saved settings, including the Composer scene and calibration | Re-setup after each update | `halo_kb.py scene-backup` before flashing and `scene-restore --save` after. Studio also keeps your scenes in the browser. |
+| Macro space drops from 2,400 to 1,485 bytes | Fewer or shorter VIA macros | You use none today. |
+| Each Esc-held flash wipes saved settings, including the Composer scene | Re-setup after each update | The calibration is built into the defaults now, and so is your look. For a custom scene: `halo_kb.py scene-backup` before flashing and `scene-restore --save` after. Studio also keeps your scenes in the browser. A flash-based scene store (roadmap) would survive flashes. |
 
-## Roadmap (on hold until hardware verification passes)
+## Roadmap (unblocked 2026-09-25; nothing started)
 
 Ideas carried over from the chat's research, with feasibility notes, are in [BACKGROUND.md](BACKGROUND.md#roadmap). In the order that seems most useful:
 
 1. **White balance per group** (keys vs halo): the halo diffuser tints light differently from keycaps. Cheap.
 2. **Layer-aware lighting**: hold Fn and the active keys glow. Cheap.
-3. **Several saved scenes on Fn+M+1…4**: limited by EEPROM space. Needs a compact scene format or fewer VIA layers.
-4. **Host-driven effects** (notifications, screen-edge ambience, audio): the editor or a small tray app streams over USB.
+3. **Several saved scenes on Cmd+Fn+1…8**: best as a small store in unused flash (8 full scenes). See [RESEARCH_PRESETS_AND_SLOTS.md](RESEARCH_PRESETS_AND_SLOTS.md).
+4. **Battery gauge on the function row**: Fn+\ lights Esc…F12 as a bar in the battery's color (your idea).
+5. **Host-driven effects** (notifications, screen-edge ambience, audio): the editor or a small tray app streams over USB.
 
 ## Timeline
 
@@ -121,3 +120,4 @@ Ideas carried over from the chat's research, with feasibility notes, are in [BAC
 | 2026-09-24, ~12:15 AM | Session work stopped early (a stopped turn, not the PC sleeping). Done by then: import, Docker builds, host tests, firmware fixes, editor review. |
 | 2026-09-24, 12:12 PM | PC crashed or lost power (Windows logged an unexpected shutdown), unrelated to this work |
 | 2026-09-24, afternoon | Editor fixes + regression tests, GitHub repo + CI + Pages, keyboard CLI, documentation |
+| 2026-09-25, early morning | First flash: Stages 1–3 pass. Studied editable presets and scene slots. Update from your notes: Fn+Enter, magenta Caps Lock, measured halo layout, new default look with a mint flash and ripple, the Ripple reach setting, and Studio fixes |

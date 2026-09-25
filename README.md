@@ -4,11 +4,11 @@
 
 - color **every one of the 128 LEDs** individually, including all 45 "halo" LEDs around the base;
 - apply **effects that keep your colors** (breathe, wave, candle, comet, ripple, ...) instead of replacing them;
-- split the board into **up to 8 zones**, each with its own effect, speed and brightness range. For example, WASD breathes fast while the halo breathes slowly between 50% and 100%;
+- split the board into **up to 8 zones**, each with its own effect, speed and brightness range. For example, keys that flash on a key press while the halo breathes slowly between 30% and 100%;
 - use **multi-color gradients**, keypress reactions, starter scenes, and an animated preview that matches the keyboard exactly.
 
 > [!WARNING]
-> **Status (2026-09-24): not yet run on a real keyboard.** Everything that can be checked without one passes: firmware build, lighting math, protocol and editor end to end (see [docs/PLAN.md](docs/PLAN.md#verification)). The first flash is a supervised session: follow [docs/FLASHING.md](docs/FLASHING.md). NuPhy's official firmware can always be flashed back.
+> **Status (2026-09-25): running on a real Halo75 V2.** The bring-up checklist passed on the author's keyboard; a day-long battery comparison is still open ([results](docs/FLASHING.md#results-2026-09-25)). Each new build is also checked automatically (firmware build, lighting math, protocol, editor end to end). NuPhy's official firmware can always be flashed back.
 
 | I want to... | Go to |
 |---|---|
@@ -17,6 +17,7 @@
 | Learn the editor and the keyboard shortcuts | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) |
 | See what ryodeushii's firmware and Halo Composer each add (one page) | [docs/WHATS_DIFFERENT.md](docs/WHATS_DIFFERENT.md) |
 | See the plan, what changed from the original design, and what's verified | [docs/PLAN.md](docs/PLAN.md) |
+| Read the study on editable presets and several stored scenes | [docs/RESEARCH_PRESETS_AND_SLOTS.md](docs/RESEARCH_PRESETS_AND_SLOTS.md) |
 | Understand how it works (firmware, protocol, data format) | [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) |
 | Read why NuPhy's "QMK/VIA" falls short, plus the research and roadmap | [docs/BACKGROUND.md](docs/BACKGROUND.md) |
 | Build or test it (developers, Claude Code) | [docs/DEVELOPING.md](docs/DEVELOPING.md) |
@@ -62,7 +63,7 @@ The editor only talks to the keyboard over the **USB cable in wired mode**. The 
 | `docs/` | Everything above |
 | `chat-handoff/HALO_COMPOSER.md` | The original design document from the claude.ai conversation (historical) |
 
-Firmware files are built automatically on every change and can be downloaded from the latest run on the [Actions tab](https://github.com/DRebd/halo-composer/actions). They're labelled *UNTESTED-on-hardware* until the bring-up checklist passes.
+Firmware files are built automatically on every change and can be downloaded from the latest run on the [Actions tab](https://github.com/DRebd/halo-composer/actions). They're labelled *UNTESTED-on-hardware* because each automatic build is new; tested files will be attached to tagged releases.
 
 ## Credits and license
 

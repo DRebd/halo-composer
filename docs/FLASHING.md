@@ -34,6 +34,7 @@ These are NuPhy's official steps (https://nuphy.com/pages/update-instructions, u
 ## Part 3: bring-up checklist
 
 Tick each item. If something fails, stop and note what you saw. Claude Code can compare it against the code.
+Lines that start with **Claude Code:** are commands Claude Code runs for you from this project folder; you don't run them yourself.
 
 ### Stage 1: ryodeushii's firmware alone (`nuphy_halo75v2_ansi_via.bin`)
 
@@ -49,11 +50,11 @@ This checks the base firmware on your keyboard before any of our code is involve
 ### Stage 2: Halo Composer (`nuphy_halo75v2_ansi_composer.bin`)
 
 - [ ] Flash it. Typing works.
-- [ ] **Composer starts on by itself** after this flash. If it's not showing, press **Fn+Shift+←** once (it's the last effect in the list), or have Claude Code run `python tools\halo_kb.py on`.
-- [ ] **Default look:** warm-white keys, WASD a deeper warm tone, and an amber halo breathing gently between half and full brightness (one breath is about 4.7 s).
-- [ ] **Stock effects still work:** Fn+← steps into NuPhy's effects (Solid Color, ...) and the halo shows NuPhy's own modes again. Fn+Shift+← steps back to Composer.
+- [ ] **Composer starts on by itself** after this flash. If it isn't showing, press **Fn+Enter**, which jumps straight to Composer (builds from 2026-09-25 on), or have Claude Code run `python tools\halo_kb.py on`.
+- [ ] **Default look:** 2700K warm-white keys; the key you press flashes mint (#70FF94) for about half a second and sends a mint ripple about two keys outwards; a 2700K halo breathing between 30% and 100% (one breath is about 4.7 s). *(Builds before 2026-09-25 had a warm-white/amber look.)*
+- [ ] **Stock effects still work:** Fn+← steps forward through the effect list (Solid Color, ...) and the halo shows NuPhy's own modes again; Fn+Shift+← steps backwards. Composer is the last of 43 entries, so stepping only returns to it after going round. **Fn+Enter** jumps back to Composer from anywhere, and pressing it again returns to the stock effect you were on.
 - [ ] **Brightness keys:** Fn+↑/↓ changes the keys, Fn+M+↑/↓ changes the halo (6 steps). Turn the keys all the way down: the halo must **stay lit** (this tests the LED-power patch).
-- [ ] **Indicators on top:** Caps Lock lights the status bar, Fn+\ shows the battery, and flipping the Win/Mac switch shows its indicator. None of them flicker, and they disappear cleanly.
+- [ ] **Indicators on top:** Caps Lock turns the Caps key and the status bar **magenta** (Fn+Caps cycles bar / key / both / off), Fn+\ shows the battery, and flipping the Win/Mac switch shows its indicator. None of them flicker, and they disappear cleanly.
 - [ ] **Boot animation:** unplug and re-plug. NuPhy's power-on sweep plays around the halo, then Composer takes over without a glitch.
 - [ ] Claude Code: `python tools\halo_kb.py status`. The frame rate should be **≥ 25 fps**.
 - [ ] Claude Code: `python tools\halo_kb.py selftest`. All checks should pass. It only uses the keyboard's temporary memory and puts everything back.
@@ -62,14 +63,35 @@ This checks the base firmware on your keyboard before any of our code is involve
 ### Stage 3: Halo Studio with the keyboard
 
 - [ ] Open **https://drebd.github.io/halo-composer/** in Chrome or Edge → **Connect keyboard** → pick the NuPhy entry in the browser's pop-up. The pill at the top reads "Connected · Composer on".
-- [ ] **Calibrate the halo** (Halo setup tab → Start placing). One amber LED lights up on the keyboard. Click where it is on the drawing and repeat for all 45 (Skip any you can't see). Then **Walk the ring** and check the order goes smoothly around, and click **Save to keyboard**.
-- [ ] Claude Code: `python tools\halo_kb.py scene-backup backups\calibrated.halo.json`. This keeps the calibration safe across future flashes.
+- [ ] **Calibrate the halo** (Halo setup tab → Start placing). One amber LED lights up on the keyboard. Click where it is on the drawing and repeat (Skip any you can't see; LEDs 9, 10 and 45 have no LED fitted and are skipped automatically). Then **Walk the ring**, check the order goes smoothly around, and click **Save to keyboard**. *Since 2026-09-25 the built-in positions are the ones measured on your keyboard, so this is only needed if something looks off.*
+- [ ] Claude Code: `python tools\halo_kb.py scene-backup backups\calibrated.halo.json` (nothing for you to do). This keeps the calibration safe across future flashes.
 - [ ] Try a few **starter scenes** (Scenes tab). *Typing Ripples* is the heaviest. While it runs, type fast: typing must never lag. Then measure again with Device → *Measure keyboard frame rate*. It should stay ≥ 25 fps.
 - [ ] **Persistence:** Save, unplug, re-plug. The saved scene comes back, and VIA key changes (if any) are still there.
 - [ ] **Wireless and sleep:** switch to 2.4 GHz / Bluetooth. Lighting keeps running, and Studio can't connect (expected, since it's USB only). Let the keyboard sleep and wake it: the lighting comes back.
 - [ ] **Battery (over a day):** compare battery drain with the halo on against what you're used to.
 
-When everything is ticked, tell Claude Code. Next steps: tag a release, and feed your calibrated halo positions into the defaults.
+When everything is ticked, tell Claude Code.
+
+### Results (2026-09-25)
+
+Stages 1–3 passed on your keyboard. Only the day-long battery comparison is still open.
+
+- Self-test on the keyboard: 27/27. Frame rate: **40 fps**, which is the firmware's fixed ceiling. It drops to **30 fps** with the heaviest reactive scene while 31 key presses per second are simulated (2–3× the fastest human typing).
+- Halo calibration done. LEDs 9, 10 and 45 have no LED fitted. The measured positions are now the built-in defaults.
+- Changes made from your notes, all in the 2026-09-25 update:
+  - Fn+Enter jumps to Composer;
+  - Caps Lock turns magenta on the key and the status bar;
+  - a new default look;
+  - Studio fixes (color picker, zone cards, bezels, hidden unfitted LEDs, true-to-LED preview).
+
+### Stage 4: after flashing the 2026-09-25 update
+
+- [ ] Flash `nuphy_halo75v2_ansi_composer.bin` with Esc held (Part 2). Typing works.
+- [ ] The default look matches Stage 2, and halo effects line up without recalibrating.
+- [ ] **Fn+Enter** switches between Composer and the stock effect you were last on (Solid Color right after a flash).
+- [ ] **Caps Lock** lights the Caps key and the status bar magenta.
+- [ ] In VIA, with the new `dist\halo75v2_composer_via3.json`, the Fn+Enter key shows as "Composer On/Off", and Fn+Ins shows as "Toggle Power On Animation".
+- [ ] Claude Code: `python tools\halo_kb.py selftest`.
 
 ## Part 4: going back to NuPhy's original firmware
 
@@ -92,5 +114,6 @@ Or in Studio: **Scenes → My scenes** keeps everything you saved in that browse
 | Studio says "not running the Halo Composer firmware" | The keyboard is still on stock or ryodeushii `via` firmware. Flash `...composer.bin` |
 | Studio "timeout" or VIA "Receiving incorrect response" | Another tab or app is using the keyboard. Close VIA and other Studio tabs, then reconnect |
 | Keys dark but the halo lit, or the reverse | Brightness: Fn+↑ for keys, Fn+M+↑ for the halo. In Studio, check the zone's Min/Max brightness |
+| A stock effect is showing instead of your Composer look | Press **Fn+Enter** |
 | Composer look gone after unplugging | The scene wasn't saved. In Studio press **Save to keyboard** |
 | Everything reset after holding Fn+[ | That's NuPhy's factory reset (hold 3 s). It also resets the Composer scene. Restore with `scene-restore --save` |
