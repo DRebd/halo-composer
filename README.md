@@ -96,6 +96,7 @@ Every update to the project on GitHub is built and tested automatically: the fir
 ## Future improvements
 
 - **Simplify Studio**, the top priority: smart defaults and single controls that set several related settings at once, with every advanced option kept.
+- **Keyboard settings in Studio**: sleep, debounce and the indicator options in the Device tab, so you don't also need VIA.
 - **Several scenes on the keyboard**, switched with Cmd+Fn+1…8 without opening Studio.
 - **A battery gauge across the function row**: Esc to F12 lit as a charge bar.
 - **A halo that follows the screen or the music**, streamed from the computer over USB.

@@ -199,7 +199,7 @@ function init() {
   });
   window.addEventListener('resize', () => { hideTip(); layout(); });
   layout(); renderTab(); updateConn(); updateSelInfo(); requestAnimationFrame(tick);
-  window.HaloStudio = { state, engine, markAll, flush, importProfile, exportProfile, SCENES };
+  window.HaloStudio = { state, engine, markAll, flush, importProfile, exportProfile, thinBackups, SCENES };
 }
 init();
 })();

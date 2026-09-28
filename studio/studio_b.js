@@ -160,22 +160,41 @@ navigator.hid?.addEventListener?.('disconnect', (e) => {
   if (state.link && e.device === state.link.dev) dropLink('keyboard disconnected');
 });
 
-const AUTO_BACKUPS = 5;
-function backupEditor(label) {
-  const lib = loadLibrary();
-  const entry = exportProfile(`${label} ${new Date().toLocaleString()}`); entry.auto = true;
+// Automatic backups of the editor's scene, stored in the library with auto = true.
+// Stored names read "Editor before connecting <date>"; the list shows the short label.
+const BACKUP_LABELS = { connect: 'Before connecting', read: 'Before reading keyboard', factory: 'Before factory scene' };
+const backupLabel = (p) => Object.values(BACKUP_LABELS).find((l) => p.name?.startsWith('Editor ' + l.toLowerCase())) || 'Automatic backup';
+const createdMs = (p) => Date.parse(p.created) || 0;
+const newestFirst = (a, b) => createdMs(b) - createdMs(a);
+// Backups thin out as they age: the 3 newest always stay; beyond that at most one per
+// hour for a day, one per day for a week, one per week up to 8 weeks, then one per
+// 30 days, keeping the newest in each slot; 20 at most. Named saves are never touched.
+const HOUR = 36e5, DAY = 24 * HOUR, WEEK = 7 * DAY;
+const BACKUP_TIERS = [[DAY, HOUR], [WEEK, DAY], [8 * WEEK, WEEK], [Infinity, 30 * DAY]]; // [age under, one per]
+const BACKUP_KEEP = 3, BACKUP_MAX = 20;
+function thinBackups(lib, now = Date.now()) {
+  const autos = lib.filter((p) => p.auto).sort(newestFirst), keep = new Set(autos.slice(0, BACKUP_KEEP)), slots = new Set();
+  for (const p of autos) {
+    const t = createdMs(p), tier = BACKUP_TIERS.findIndex(([age]) => now - t < age), slot = tier + ':' + Math.floor(t / BACKUP_TIERS[tier][1]);
+    if (!slots.has(slot)) { slots.add(slot); keep.add(p); }
+  }
+  const kept = new Set(autos.filter((p) => keep.has(p)).slice(0, BACKUP_MAX));
+  return lib.filter((p) => !p.auto || kept.has(p));
+}
+// why: 'connect' | 'read' | 'factory'. Skipped when the scene equals the newest backup.
+function backupEditor(why) {
+  const lib = loadLibrary(), last = lib.filter((p) => p.auto).sort(newestFirst)[0];
+  const entry = exportProfile(`Editor ${BACKUP_LABELS[why].toLowerCase()} ${new Date().toLocaleString()}`); entry.auto = true;
+  if (last && last.scene === entry.scene) return;
   lib.push(entry);
-  // keep only the newest few automatic backups
-  let autos = lib.filter((p) => p.auto).length;
-  for (let i = 0; i < lib.length && autos > AUTO_BACKUPS;) { if (lib[i].auto) { lib.splice(i, 1); autos--; } else i++; }
-  saveLibrary(lib);
+  saveLibrary(thinBackups(lib));
 }
 
 // why: 'connect' | 'read' | 'revert' | 'factory'
 async function readScene(why = 'read') {
   const L = state.link; if (!L) return;
   await settleSync();
-  if (why !== 'revert') backupEditor({ connect: 'Editor before connecting', read: 'Editor before reading keyboard', factory: 'Editor before factory scene' }[why]);
+  if (why !== 'revert') backupEditor(why);
   const s = HC.blankScene();
   for (let start = 0; start < LED_COUNT; start += 9) {
     const n = Math.min(9, LED_COUNT - start); const r = await L.cmd(SUB.GET_COLORS, [start, n]);
@@ -196,7 +215,7 @@ async function readScene(why = 'read') {
   adoptScene(s, { keepGeometry: false, push: false });
   persistLocal();
   log('read scene from keyboard');
-  if (why === 'connect' || why === 'read') toast('Loaded the scene stored on your keyboard. Your previous editor scene is in Scenes → My scenes.');
+  if (why === 'connect' || why === 'read') toast('Loaded the scene stored on your keyboard. Your previous editor scene is in Scenes → Automatic backups.');
 }
 
 // dirty tracking + serialized sync (RAM only; Save writes EEPROM)

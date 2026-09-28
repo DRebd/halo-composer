@@ -96,6 +96,12 @@ input[type=color]{width:38px;height:28px;padding:0;border:1px solid var(--line2)
 .scene b{font-family:var(--display);font-size:15px}
 .scene span{font-size:12px;color:var(--muted)}
 .scene:hover{border-color:var(--amber)}
+.sec h4{margin:6px 0 0;font-family:var(--display);font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--faint);font-weight:600}
+.sec h4+.hint{margin:0}
+.libitem{display:flex;flex-direction:column;gap:3px;padding:7px 0;border-top:1px solid var(--line)}
+.libitem:last-child{border-bottom:1px solid var(--line)}
+.libitem b{font-weight:500;overflow-wrap:anywhere}
+.libitem .mono{flex:1;font-size:12px}
 .log{font-family:var(--mono);font-size:11px;background:var(--sunken);border:1px solid var(--line);border-radius:8px;padding:8px;max-height:180px;overflow:auto;white-space:pre-wrap;color:var(--muted)}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-family:var(--mono);font-size:12px}
 .kv span:nth-child(odd){color:var(--muted)}
@@ -114,7 +120,7 @@ input[type=color]{width:38px;height:28px;padding:0;border:1px solid var(--line2)
 .fgroup{display:flex;flex-direction:column;gap:2px}
 .fnote{margin:0 0 0 118px;font-size:12px;line-height:1.35;color:var(--muted)}
 /* hover help: labels that explain themselves get a dotted underline; the bubble is #tip */
-.field>label[data-tip],h3[data-tip],.label[data-tip],.check[data-tip]>span,.kv [data-tip]{text-decoration:underline dotted;text-decoration-color:var(--faint);text-decoration-thickness:1px;text-underline-offset:3px;cursor:help}
+.field>label[data-tip],h3[data-tip],h4[data-tip],.label[data-tip],.check[data-tip]>span,.kv [data-tip]{text-decoration:underline dotted;text-decoration-color:var(--faint);text-decoration-thickness:1px;text-underline-offset:3px;cursor:help}
 .tip{position:fixed;z-index:30;max-width:300px;padding:7px 10px;border-radius:8px;background:#262a33;border:1px solid var(--line2);color:var(--ink);font:400 12.5px/1.45 var(--body);letter-spacing:0;text-transform:none;box-shadow:0 10px 28px rgba(0,0,0,.55);pointer-events:none}
 .tip[hidden]{display:none}
 @media (prefers-reduced-motion: reduce){.sw:hover{transform:none}}

@@ -34,7 +34,7 @@ Everything below is for making it your own.
 
 1. Plug in the USB cable and set the switch on the keyboard to **wired**. Close VIA (the key-remapping web app) and any other Studio tab.
 2. Click **Connect keyboard** and pick the NuPhy entry in the browser pop-up. The browser only lets the page talk to the device you pick.
-3. Studio reads the scene stored on the keyboard. Whatever was in the editor before is saved automatically under **Scenes → My scenes**.
+3. Studio reads the scene stored on the keyboard. Whatever was in the editor before is saved automatically under **Scenes → Automatic backups**.
 
 The pill at the top shows the state: *Preview only* (not connected), *Connected · Composer off*, or *Connected · Composer on*. While connected, the Connect button reads **Disconnect**.
 
@@ -152,7 +152,8 @@ A zone uses a gradient when its Source is *Gradient*. The *Flow* effect makes it
 ### Scenes
 
 - **Starter scenes:** Warm Desk (the factory look), Ember Comet, Aurora Drift, Synthwave, Candlelight, Typing Ripples, Focus, Stealth, Rainbow Classic, Heatmap and Ocean Tide. Loading one replaces the look in the editor and, with Live push on, sends it to the keyboard. Click **Save to keyboard** to keep it. Loading a scene never changes your halo calibration.
-- **My scenes (this browser):** type a name and click **Save current**. Each saved scene has **Load**, **Export** and **Delete** buttons. They're stored *in this browser, for this web address only*. Studio also keeps its last 5 automatic backups, made when you connect, read from the keyboard, or load the factory scene.
+- **My scenes (this browser):** type a name and click **Save current**. Your saves are listed first, newest at the top. Each one has **Load**, **Export** and **Delete** buttons. They're stored *in this browser, for this web address only*.
+- **Automatic backups** are listed below your saves, newest first, each with the date and time it was made. Studio saves a copy of the editor's scene by itself just before it connects to the keyboard, reads the keyboard, or loads the factory scene, so you can always get back what you were working on. It skips the copy if the scene hasn't changed since the last backup. Recent backups are kept close together and older ones are thinned out: the 3 newest always stay, then about one per hour for the last day, one per day for the last week, one per week for 8 weeks, and one per month after that, with at most 20 in all. Your own saves are never removed automatically.
 - **Export current as file** and **Import file…** (`.halo.json`) move scenes between browsers or computers, or let you share them. Importing keeps the halo layout that's already in the editor.
 - The keyboard stores **one** saved scene: the last one you saved with **Save to keyboard**. Keeping several scenes on the keyboard and switching between them from the keyboard is on the roadmap; see [ROADMAP_AND_HISTORY.md](ROADMAP_AND_HISTORY.md).
 
@@ -180,7 +181,7 @@ To calibrate:
 
 - **Connection details:** device name, protocol version, LED count, whether Composer is active, and the scene size.
 - **Turn Composer on** / **Switch back to previous effect** does the same as Fn+Enter.
-- **Read from keyboard** loads the keyboard's current scene into the editor. The editor's scene is backed up to My scenes first.
+- **Read from keyboard** loads the keyboard's current scene into the editor. The editor's scene is backed up first (see **Scenes → Automatic backups**).
 - **Push editor to keyboard** sends the whole editor scene to the keyboard's temporary memory, which is useful with Live push off. Save to keep it.
 - **Factory scene** loads the factory look but keeps your halo calibration. Save to keep it.
 - **Match screen colors (perceptual brightness)**: on, colors and brightness levels look on the keys the way they look on screen. The factory look uses it. Off, the LEDs get raw values, which look whiter and brighter than on screen. The other starter scenes were designed with it off. It's saved as part of the scene.

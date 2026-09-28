@@ -187,7 +187,8 @@ const TIP = {
   // Effects, Scenes
   useFx: 'Switches the zone you are editing on the Zones tab to this effect.',
   starters: 'Ready-made looks. Loading one replaces the editor\'s scene (your halo calibration is kept) and, with Live push on, sends it to the keyboard. Save to keyboard keeps it.',
-  myScenes: 'Scenes saved in this browser only, for this web address. Use Export to move them to another computer or browser.',
+  myScenes: 'Your own saves, newest first, then the automatic backups. They are kept in this browser only, for this web address. Use Export to move them to another computer or browser.',
+  autoBackups: 'Copies of the editor\'s scene that Studio keeps by itself before it connects, reads the keyboard or loads the factory scene. No copy is made if the scene hasn\'t changed since the last one. The 3 newest always stay; older ones are thinned to about one per hour for a day, one per day for a week, one per week for 8 weeks, then one per month, 20 at most. Your own saves are never removed.',
   saveCurrent: 'Saves the editor\'s scene to the list below under the name you typed.',
   loadScene: 'Loads this scene into the editor (and onto the keyboard, with Live push on). Your halo calibration is kept.',
   exportScene: 'Downloads this scene as a .halo.json file.',
@@ -209,7 +210,7 @@ const TIP = {
   // Device
   connection: 'The keyboard Studio is talking to.',
   composerOnOff: 'Does the same as Fn+Enter: switches the keyboard\'s lighting to Composer, or back to the stock effect it was on.',
-  readKb: 'Loads the keyboard\'s current scene into the editor. The editor\'s scene is backed up to My scenes first.',
+  readKb: 'Loads the keyboard\'s current scene into the editor. The editor\'s scene is backed up first (Scenes → Automatic backups).',
   pushKb: 'Sends the whole editor scene to the keyboard\'s temporary memory. Useful with Live push off. Save to keep it.',
   factory: 'Loads the factory look (Warm Desk) but keeps your halo calibration. Save to keep it.',
   sceneOpts: 'Settings saved with the scene that affect every zone.',

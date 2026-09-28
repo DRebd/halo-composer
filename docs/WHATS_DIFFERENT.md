@@ -1,19 +1,19 @@
 # What's different: NuPhy stock → ryodeushii → Halo Composer
 
-*Sources: ryodeushii's [release notes](https://github.com/ryodeushii/qmk-firmware/releases), his commit history, and the readme and VIA definition in his source (pinned commit `9847cb8`, July 2026), plus this repository's code. Both his firmware and Halo Composer have been run on the developer's Halo75 V2 (ANSI). The wireless, battery and latency improvements in section 1 are as ryodeushii describes them; they weren't measured here. Terms such as QMK and VIA are explained in the README's [plain-English glossary](../README.md#plain-english-glossary).*
+*Sources: ryodeushii's [release notes](https://github.com/ryodeushii/qmk-firmware/releases), the commit history, and the readme and VIA definition in the source (pinned commit `9847cb8`, July 2026), plus this repository's code. Both ryodeushii's firmware and Halo Composer have been run on the developer's Halo75 V2 (ANSI). The wireless, battery and latency improvements in section 1 are as ryodeushii describes them; they weren't measured here. Terms such as QMK and VIA are explained in the README's [plain-English glossary](../README.md#plain-english-glossary).*
 
 ## 1. What ryodeushii's firmware improves over NuPhy's stock firmware
 
 A community maintainer's rework of NuPhy's own QMK source. It keeps the same keyboard layout, fixes the parts NuPhy left rough, and exposes many hidden settings.
 
-- **Wireless that works properly.** His first Halo75 V2 release notes say Bluetooth and 2.4 GHz "now work correctly in comparison with official firmware", thanks to reworked radio-driver code (credited to @jincao1).
+- **Wireless that works properly.** ryodeushii's first Halo75 V2 release notes say Bluetooth and 2.4 GHz "now work correctly in comparison with official firmware", thanks to reworked radio-driver code (credited to @jincao1).
 - **Better battery life and sleep.**
   - Deep sleep in wireless modes, which cuts idle drain a lot.
   - Separate on/off switches for sleep, deep sleep and sleep-while-on-USB.
   - An adjustable sleep timeout.
   - July 2026 fixes so the lights come back exactly as they were after waking.
-- **Typing fixes.** Adjustable debounce (how long the keyboard waits to confirm a key press or release, 0–30 ms each), which cures chattering or double-typed keys. There's also a faster custom key-scanning routine, and he published latency test results.
-- **Far more in VIA.** Stock VIA shows one "Backlight" menu. His VIA definition adds:
+- **Typing fixes.** Adjustable debounce (how long the keyboard waits to confirm a key press or release, 0–30 ms each), which cures chattering or double-typed keys. There's also a faster custom key-scanning routine, and ryodeushii published latency test results.
+- **Far more in VIA.** Stock VIA shows one "Backlight" menu. ryodeushii's VIA definition adds:
   - a **Halo Light** menu: mode, speed, brightness, and any static color from a color picker instead of NuPhy's 8 presets;
   - **Custom Configs**: debounce, sleep and indicator settings.
 - **Better indicators.**
@@ -23,7 +23,7 @@ A community maintainer's rework of NuPhy's own QMK source. It keeps the same key
   - Holding Fn lights up every key that has a function, color-coded by type.
 - **Small fixes to NuPhy's layout:** Insert and Delete were swapped, and the macOS brightness keys were non-standard.
 - **Up to date.** Synced with upstream QMK 0.32.7, whereas NuPhy's source updates rarely and trails its releases. It also offers optional support for SignalRGB, a desktop lighting-control app (a separate `srgb` build).
-- **Caveat:** the July 2026 code Halo Composer builds on hasn't been packaged as a release. His last release is ryo-1.1.4 from September 2024.
+- **Caveat:** the July 2026 code Halo Composer builds on hasn't been packaged as a release. The last release is ryo-1.1.4 from September 2024.
 
 **What it still can't do:** let you design the lighting yourself, LED by LED. The keys run one stock effect at a time, all sharing one color setting, and the halo is still a single strip with NuPhy's 4 halo modes plus Off. There's no way to give individual LEDs their own colors, run different effects on different parts of the board, or layer keypress reactions over an effect.
 

@@ -310,8 +310,18 @@ function drawFxPreviews(t) {
 }
 
 // Scenes -----------------------------------------------------------------
+// "Sep 25" / "Sep 25, 6:24 AM", with the year when it isn't this year.
+function whenSaved(p, time) {
+  const d = new Date(p.created); if (isNaN(d)) return '';
+  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric', hour: time ? 'numeric' : undefined, minute: time ? '2-digit' : undefined });
+}
 function tabScenes(body) {
-  const lib = loadLibrary();
+  const lib = loadLibrary(), mine = lib.filter((p) => !p.auto).sort(newestFirst), autos = lib.filter((p) => p.auto).sort(newestFirst);
+  const item = (p) => el('div', { class: 'libitem' }, el('b', {}, p.auto ? backupLabel(p) : p.name),
+    el('div', { class: 'row' }, el('span', { class: 'mono muted' }, whenSaved(p, p.auto)),
+      el('button', { class: 'btn small', 'data-tip': TIP.loadScene, onclick: () => { importProfile(p); toast(p.auto ? `Loaded the backup from ${whenSaved(p, true)}.` : `Loaded "${p.name}".`); renderTab(); } }, 'Load'),
+      el('button', { class: 'btn small', 'data-tip': TIP.exportScene, onclick: () => downloadJson(p, p.name) }, 'Export'),
+      el('button', { class: 'btn small', 'data-tip': TIP.deleteScene, onclick: () => { lib.splice(lib.indexOf(p), 1); saveLibrary(lib); renderTab(); } }, 'Delete')));
   const nameIn = el('input', { type: 'text', placeholder: 'Name this scene', 'aria-label': 'Scene name' });
   const file = el('input', { type: 'file', accept: '.json,application/json', hidden: true });
   file.addEventListener('change', async () => { try { const j = JSON.parse(await file.files[0].text()); importProfile(j); toast(`Imported "${j.name}".`); renderTab(); } catch (e) { toast('Import failed: ' + e.message); } });
@@ -320,12 +330,11 @@ function tabScenes(body) {
       el('div', { class: 'scenes' }, SCENES.map((sc) => el('button', { class: 'scene', onclick: () => { adoptScene(sc.build()); state.zoneNames = sc.names.concat(state.zoneNames.slice(sc.names.length)); updateSelInfo(); toast(`Loaded "${sc.name}". ${state.link ? 'Pushed to the keyboard; Save to keep it.' : ''}`); } },
         el('b', {}, sc.name), el('span', {}, sc.note))))),
     el('div', { class: 'sec' }, h3('My scenes (this browser)', TIP.myScenes),
-      el('div', { class: 'row' }, nameIn, el('button', { class: 'btn primary', 'data-tip': TIP.saveCurrent, onclick: () => { const n = nameIn.value.trim() || `Scene ${lib.length + 1}`; lib.push(exportProfile(n)); saveLibrary(lib); renderTab(); toast(`Saved "${n}" in this browser.`); } }, 'Save current')),
-      lib.length ? el('div', { class: 'sec' }, lib.map((p, i) => el('div', { class: 'row' },
-        el('span', { style: 'flex:1' }, p.name), el('span', { class: 'mono muted' }, (p.created || '').slice(0, 10)),
-        el('button', { class: 'btn small', 'data-tip': TIP.loadScene, onclick: () => { importProfile(p); toast(`Loaded "${p.name}".`); renderTab(); } }, 'Load'),
-        el('button', { class: 'btn small', 'data-tip': TIP.exportScene, onclick: () => downloadJson(p, p.name) }, 'Export'),
-        el('button', { class: 'btn small', 'data-tip': TIP.deleteScene, onclick: () => { lib.splice(i, 1); saveLibrary(lib); renderTab(); } }, 'Delete')))) : el('p', { class: 'hint' }, 'Nothing saved yet.'),
+      el('div', { class: 'row' }, nameIn, el('button', { class: 'btn primary', 'data-tip': TIP.saveCurrent, onclick: () => { const n = nameIn.value.trim() || `Scene ${mine.length + 1}`; lib.push(exportProfile(n)); saveLibrary(lib); renderTab(); toast(`Saved "${n}" in this browser.`); } }, 'Save current')),
+      mine.length ? el('div', { 'data-k': 'mine' }, mine.map(item)) : el('p', { class: 'hint' }, 'Nothing saved yet.'),
+      autos.length ? [el('h4', { 'data-tip': TIP.autoBackups }, 'Automatic backups'),
+        el('p', { class: 'hint' }, 'Made before Studio connects, reads the keyboard or loads the factory scene. Older ones are thinned out as they age.'),
+        el('div', { 'data-k': 'backups' }, autos.map(item))] : null,
       el('div', { class: 'row' }, el('button', { class: 'btn', 'data-tip': TIP.exportCurrent, onclick: () => downloadJson(exportProfile(nameIn.value.trim() || 'halo-scene'), nameIn.value.trim() || 'halo-scene') }, 'Export current as file'), el('button', { class: 'btn', 'data-tip': TIP.importFile, onclick: () => file.click() }, 'Import file…'), file)),
     el('p', { class: 'hint' }, 'The keyboard stores one scene (the one you Save). Warm Desk is the factory look. Keep as many as you like here and push any of them. Scenes here live in this browser only, for this web address: use Export to move them between computers or browsers. Loading a scene never changes your halo calibration.'),
   );

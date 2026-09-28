@@ -175,6 +175,52 @@ let packets = 0;
   ok((g3 & 1) !== (g2 & 1) && (g3 & 2) === 2, '"Blend the last color into the first" toggles gradient flag 1 only', `${g2} -> ${g3}`);
   await p.waitForTimeout(1200);
   await cmp('gradient flags reach the keyboard: firmware RAM == GUI', 'SCENE');
+
+  // 10. My scenes: named saves first; automatic backups thin out with age and skip repeats
+  // 10a. thinBackups on made-up dates (k… kept, x… removed, mine… named saves)
+  const thin = await p.evaluate(() => {
+    const H = 36e5, D = 24 * H, W = 7 * D, M = 30 * D, now = Date.UTC(2026, 8, 28, 12, 30);
+    const at = (t, name, auto = true) => ({ name, created: new Date(t).toISOString(), auto });
+    const wk = Math.floor((now - 20 * D) / W) * W, mo = Math.floor((now - 100 * D) / M) * M; // starts of a week / 30-day slot
+    const lib = [
+      at(now - 2 * 60e3, 'k2'), at(now - 25 * 60e3, 'x1'), at(now - 60e3, 'k1'), at(now - 3 * 60e3, 'k3'), // 3 newest always stay
+      at(Date.UTC(2020, 0, 1), 'mine old', false), at(now - 40 * 60e3, 'k4'), at(now - 80 * 60e3, 'x2'), at(now - 23.5 * H, 'k5'), // < 1 day: one per hour
+      at(Date.UTC(2026, 8, 26, 20), 'k6'), at(Date.UTC(2026, 8, 26, 9), 'x3'), at(Date.UTC(2026, 8, 23, 10), 'k7'), // < 7 days: one per day
+      at(now - 60e3, 'mine new', false), at(wk + D, 'x4'), at(wk + 3 * D, 'k8'), at(wk - 2 * W + D, 'k9'), // < 8 weeks: one per week
+      at(mo + 5 * D, 'x5'), at(mo + 20 * D, 'k10'), at(mo - M + 5 * D, 'k11'), at(mo - 5 * M, 'k12'), // older: one per 30 days
+    ];
+    // cap: 24 hourly + 6 daily backups, each in its own slot, and 3 named saves
+    const many = [];
+    for (let h = 0; h < 24; h++) many.push(at(now - h * H - 60e3, 'h' + h));
+    for (let d = 1; d < 7; d++) many.push(at(now - d * D - 2 * H, 'd' + d));
+    many.splice(5, 0, at(now - 100 * D, 'mine 1', false)); many.push(at(now, 'mine 2', false), at(0, 'mine 3', false));
+    return { kept: HaloStudio.thinBackups(lib, now).map((q) => q.name), capped: HaloStudio.thinBackups(many, now).map((q) => q.name) };
+  });
+  const autoK = thin.kept.filter((n) => /^[kx]/.test(n)).sort((a, b) => a.slice(1) - b.slice(1));
+  ok(autoK.join() === 'k1,k2,k3,k4,k5,k6,k7,k8,k9,k10,k11,k12', 'backup thinning: 3 newest, then one per hour / day / week / 30 days, newest in each', thin.kept.join());
+  ok(thin.kept.filter((n) => n.startsWith('mine')).join() === 'mine old,mine new', '... named saves are never removed', thin.kept.join());
+  ok(thin.capped.filter((n) => /^[hd]\d/.test(n)).join() === Array.from({ length: 20 }, (_, i) => 'h' + i).join(), 'backup thinning: at most 20 backups, the oldest go first', thin.capped.join());
+  ok(thin.capped.filter((n) => n.startsWith('mine')).join() === 'mine 1,mine 2,mine 3', '... named saves are never removed by the cap', thin.capped.join());
+  // 10b. no backup when the editor's scene is the same as the newest backup
+  const newestBackup = () => p.evaluate(() => JSON.parse(localStorage.getItem('halo-studio/v1/library') || '[]').filter((q) => q.auto).map((q) => q.created).sort().pop());
+  const readKb = async () => { await p.click('text=Read from keyboard'); await p.waitForTimeout(1500); };
+  await p.click('#tabs button[data-tab=device]');
+  await readKb(); await readKb();
+  const nb1 = await newestBackup(); await readKb(); const nb2 = await newestBackup();
+  ok(nb1 && nb1 === nb2, 'reading the keyboard again with an unchanged scene makes no new backup', `${nb1} -> ${nb2}`);
+  await p.click('#tabs button[data-tab=scenes]'); await p.click('text=Stealth'); await p.waitForTimeout(2000);
+  await p.click('#tabs button[data-tab=device]'); await readKb();
+  const nb3 = await newestBackup();
+  ok(nb3 > nb2, '... but a changed scene is backed up', `${nb2} -> ${nb3}`);
+  // 10c. the list shows named saves first (newest first), then the backups with short labels
+  await p.click('#tabs button[data-tab=scenes]');
+  for (const n of ['First save', 'Second save']) { await p.fill('input[aria-label="Scene name"]', n); await p.click('text=Save current'); await p.waitForTimeout(20); }
+  const lst = await p.evaluate(() => {
+    const txt = (s) => [...document.querySelectorAll(s)].map((e) => e.textContent), mine = document.querySelector('[data-k=mine]'), bk = document.querySelector('[data-k=backups]');
+    return { storedFirstIsBackup: !!JSON.parse(localStorage.getItem('halo-studio/v1/library'))[0].auto, mine: txt('[data-k=mine] .libitem b'), backups: txt('[data-k=backups] .libitem b'), when: txt('[data-k=backups] .libitem .mono'), mineFirst: !!(mine && bk && mine.compareDocumentPosition(bk) & Node.DOCUMENT_POSITION_FOLLOWING) };
+  });
+  ok(lst.storedFirstIsBackup && lst.mineFirst && lst.mine.join() === 'Second save,First save', 'My scenes lists named saves first, newest first, then the backups', JSON.stringify(lst));
+  ok(lst.backups.length >= 2 && lst.backups.every((t) => /^Before (connecting|reading keyboard|factory scene)$/.test(t)) && lst.when.every((t) => /^[A-Z][a-z]{2} \d{1,2}, \d{1,2}:\d\d\s[AP]M$/.test(t)), 'backups show a short label and their date and time', JSON.stringify(lst));
   // 8e. a keyboard without Composer firmware gets a clear message and no connection
   const p2 = await newStudioPage();
   await p2.goto(html + '?stock=1'); await p2.waitForTimeout(400);

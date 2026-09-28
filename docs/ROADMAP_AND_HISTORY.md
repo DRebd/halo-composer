@@ -30,6 +30,22 @@ Apart from Studio's hover help, a first step toward the first item, nothing belo
 
 **Effort:** large and open-ended; almost all of it is design work in Studio (estimate).
 
+### Keyboard settings in Studio
+
+**Why:** change the keyboard's own settings in Studio's Device tab instead of also opening VIA. Requested for version 2.
+
+**What VIA can change on this firmware** (from `dist/halo75v2_composer_via3.json`, checked against ryodeushii's source): sleep on or off, the sleep timeout (1 to 60 minutes), deep sleep on wireless (it also pauses the processor), sleep on the cable, debounce for press and release (0 to 30 ms), the battery, Caps Lock, Num Lock and power-on indicators, lighting up the special keys on the Fn layers, and the stock key and halo lighting. *Debounce* is how long a key's contacts must settle before a press or release counts, so a worn switch doesn't type a letter twice. It is most likely the "timeout for double presses".
+
+**Not a VIA setting:** the tap-or-hold window for keys that act differently when tapped and held (`TAPPING_TERM`, 200 ms). It is fixed when the firmware is built, so changing it needs a firmware change.
+
+**How:** Studio already uses VIA's USB channel, so it can send VIA's own "get", "set" and "save" commands. **No firmware change is needed.** Values apply at once; Save stores them in the EEPROM, separately from the scene.
+
+- Build the controls from the VIA definition file, so they always match the firmware Studio ships with.
+- Re-read the values on connect: Fn shortcuts change some of them too.
+- Wireless sleep settings are set over the cable and apply once the keyboard is wireless. Close VIA first, as today.
+
+**Effort:** about 8–12 hours, all in Studio, plus a check on the keyboard (estimate).
+
 ### Several stored scenes on the keyboard
 
 **Why:** switch between looks from the keyboard with **Cmd+Fn+1…8**, without opening Halo Studio. Today the keyboard holds one saved scene.
@@ -121,7 +137,7 @@ Making the stock effects editable means rewriting all 42 with new settings. The 
 - **Less VIA macro space:** 1,485 bytes with Composer (confirmed on a keyboard), against 2,400 in ryodeushii's `via` build. The scene is stored in that space.
 - **Less free RAM:** 1,496 bytes against 2,616, which rules out RAM-hungry features such as two-layer compositing for now.
 - **Frame rate:** 40 fps, the firmware's fixed ceiling. It drops to about 30 fps with the heaviest reactive starter scene while 31 key presses per second are simulated, 2–3 times the fastest human typing (measured). No typing lag was noticed when typing fast with that scene.
-- **Unreleased base firmware.** Halo Composer is built on a snapshot of ryodeushii's firmware that he hasn't published as a release (commit `9847cb8`, July 2026, pinned in `firmware/base.env`). Wireless, sleep and battery behavior come from that code. His last release, ryo-1.1.4 (September 2024), could serve as a fallback base, but the hooks would need adapting.
+- **Unreleased base firmware.** Halo Composer is built on a snapshot of ryodeushii's firmware that hasn't been published as a release (commit `9847cb8`, July 2026, pinned in `firmware/base.env`). Wireless, sleep and battery behavior come from that code. The last release, ryo-1.1.4 (September 2024), could serve as a fallback base, but the hooks would need adapting.
 - **Only the ANSI Halo75 V2, tested on one keyboard.** Other layouts and other NuPhy boards aren't supported. The built-in halo layout was measured on that keyboard. Other units are expected to match (not verified); if they don't, Studio's calibration wizard can re-measure.
 - **Two stock shortcuts go away.** NuPhy's 2.1.5 firmware has two undocumented keys on Fn+M+R and Fn+M+T. They aren't in any published source code, so no firmware built from source has them.
 
