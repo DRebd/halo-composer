@@ -323,6 +323,107 @@ static void emit_frame(hc_state_t *st, const hc_scene_t *s, uint32_t t, uint8_t 
     printf("\"]");
 }
 
+
+// Deliberately repeated keys, identical timestamps, ring-buffer wrap, timer wrap,
+// all modes/palettes and fade/radius endpoints. These frames are replayed by JS.
+static void random_vectors(int first) {
+    for (int mode = 0; mode < 3; mode++) for (int palette = 0; palette < 5; palette++) {
+        hc_scene_t s;
+        hc_scene_defaults(&s);
+        s.flags = 0;
+        memset(s.zone_of, 0, sizeof(s.zone_of));
+        hc_zone_t *z = &s.zones[0];
+        z->effect = HC_FX_STATIC;
+        z->v_min = 0; z->v_max = palette & 1 ? 20 : 0;
+        z->reactive = (uint8_t)((HC_RX_RANDOM_FLASH + mode) | ((palette * 3) << 4));
+        z->rx_color[0] = (uint8_t)(255 - palette * 40);
+        z->rx_color[1] = (uint8_t)(palette == 0 ? 1 : palette * 50);
+        z->rx_color[2] = (uint8_t)palette;
+        if (palette == 4) { // Degenerate custom palette exercises no-repeat fallback.
+            s.grad[3].count = 1;
+            s.grad[3].stop[0].r = 90; s.grad[3].stop[0].g = 10; s.grad[3].stop[0].b = 200;
+        }
+        hc_state_t st;
+        hc_state_init(&st);
+        begin_test(first++, &s, 255, 255);
+        uint32_t t = 0xFFFFFF00u;
+        emit_frame(&st, &s, t, 255, 255);
+        for (int press = 0; press < 24; press++) {
+            emit_hit(&st, &s, (uint8_t)(press % 3 == 0 ? 17 : 18), t);
+            emit_frame(&st, &s, t, 255, 255);
+            t += (uint32_t)(press % 2 == 0 ? 0 : 73);
+        }
+        for (uint32_t age = 0; age <= 2200; age += 25) emit_frame(&st, &s, t + age, 255, 255);
+        printf("]}");
+    }
+}
+
+static void random_checks(void) {
+    hc_scene_t s;
+    hc_scene_defaults(&s);
+    s.flags = 0;
+    memset(s.zone_of, 0, sizeof(s.zone_of));
+    hc_zone_t *z = &s.zones[0];
+    z->effect = HC_FX_STATIC; z->v_min = 0; z->v_max = 0;
+    z->reactive = HC_RX_RANDOM_FLASH;
+    z->rx_color[0] = 255; z->rx_color[1] = 36; z->rx_color[2] = 0;
+    hc_state_t st;
+    hc_state_init(&st);
+    bool hues[256] = {false};
+    uint8_t previous[3] = {0}, c[3], saved[3];
+    for (int i = 0; i < 1000; i++) {
+        hc_key_hit(&st, &s, 17, 100);
+        hc_hit_t *h = &st.hits[(st.hit_head + HC_MAX_HITS - 1) % HC_MAX_HITS];
+        assert(memcmp(h->color, previous, 3) != 0);
+        memcpy(previous, h->color, 3);
+        uint8_t hsv[3]; hc_rgb2hsv(h->color, hsv); hues[hsv[0]] = true;
+    }
+    int unique = 0;
+    for (int i = 0; i < 256; i++) unique += hues[i] ? 1 : 0;
+    assert(unique > 200);
+    hc_state_init(&st);
+    hc_key_hit(&st, &s, 17, 100);
+    memcpy(saved, st.hits[0].color, 3);
+    hc_key_hit(&st, &s, 18, 100);
+    assert(memcmp(saved, st.hits[0].color, 3) == 0);
+    hc_render_led(&s, &st, 17, 100, c); assert(memcmp(saved, c, 3) == 0);
+    hc_render_led(&s, &st, 18, 100, c); assert(memcmp(st.hits[1].color, c, 3) == 0);
+    hc_render_led(&s, &st, 17, 2100, c); assert(!(c[0] | c[1] | c[2]));
+    z->v_max = 255;
+    hc_render_led(&s, &st, 17, 2100, c); assert(memcmp(c, s.color[17], 3) == 0);
+    z->v_max = 0; z->rx_color[0] = 0;
+    hc_state_init(&st); hc_key_hit(&st, &s, 17, 100);
+    hc_render_led(&s, &st, 17, 100, c); assert(!(c[0] | c[1] | c[2]));
+    z->rx_color[0] = 255; z->reactive = HC_RX_RANDOM_GLOW;
+    hc_state_init(&st); hc_key_hit(&st, &s, 17, 100);
+    hc_render_led(&s, &st, 18, 100, c); assert(c[0] | c[1] | c[2]);
+    s.zone_of[18] = HC_LF_NO_REACT;
+    hc_render_led(&s, &st, 18, 100, c); assert(!(c[0] | c[1] | c[2]));
+    z->reactive = HC_RX_RANDOM_RIPPLE; z->rx_color[1] = 1;
+    s.zone_of[18] = 0;
+    hc_render_led(&s, &st, 18, 200, c); assert(!(c[0] | c[1] | c[2]));
+    // Glow contributions from both independent hits add, with saturation.
+    z->reactive = HC_RX_RANDOM_GLOW; z->rx_color[1] = 36;
+    hc_state_init(&st); hc_key_hit(&st, &s, 17, 100);
+    uint8_t a[3], b[3], both[3]; hc_render_led(&s, &st, 18, 150, a);
+    hc_key_hit(&st, &s, 18, 100); hc_render_led(&s, &st, 18, 150, both);
+    st.hits[0].led = 0xFF; hc_render_led(&s, &st, 18, 150, b);
+    for (int k = 0; k < 3; k++) assert(both[k] == (a[k] + b[k] > 255 ? 255 : a[k] + b[k]));
+    for (int i = 0; i < HC_MAX_HITS; i++) hc_key_hit(&st, &s, 19, 100);
+    for (int i = 0; i < HC_MAX_HITS; i++) assert(st.hits[i].led == 19);
+    // A palette containing only one colour falls back instead of repeating.
+    s.grad[0].count = 1;
+    s.grad[0].stop[0].r = 60; s.grad[0].stop[0].g = 20; s.grad[0].stop[0].b = 180;
+    z->rx_color[2] = 1;
+    hc_state_init(&st);
+    for (int i = 0; i < 20; i++) {
+        memcpy(previous, st.last_color[17], 3);
+        hc_key_hit(&st, &s, 17, 100);
+        assert(memcmp(previous, st.last_color[17], 3) != 0);
+    }
+    fprintf(stderr, "random checks OK: 1000 same-tick presses, hue coverage, immutable overlaps, fade, static background, brightness, no-react and radius\n");
+}
+
 int main(void) {
     assert(sizeof(hc_zone_t) == 20);
     assert(sizeof(hc_gradient_t) == 26);
@@ -362,7 +463,9 @@ int main(void) {
         }
         printf("]}");
     }
+    random_vectors(NT + NPP);
     printf("\n]}\n");
+    random_checks();
 
     behaviour_checks();
     if (bfails) {

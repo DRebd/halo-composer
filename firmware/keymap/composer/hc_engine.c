@@ -308,6 +308,32 @@ void hc_key_hit(hc_state_t *st, const hc_scene_t *s, uint8_t led, uint32_t t) {
     h->led       = led;
     hc_led_xy(s, led, &h->x, &h->y);
     h->t          = t;
+    // Timing adds entropy; the sequence also distinguishes presses in the same tick.
+    const hc_zone_t *z = &s->zones[s->zone_of[led] & HC_LF_ZONE_MASK];
+    bool random = (z->reactive & 15u) >= HC_RX_RANDOM_FLASH;
+    uint8_t pick = (uint8_t)hc_hash32(t ^ ((uint32_t)led << 16) ^ (++st->random_sequence * 0x9E3779B9u));
+    for (uint16_t n = 0; n < 256; n++, pick++) {
+        if (random && z->rx_color[2] >= 1 && z->rx_color[2] <= HC_GRADIENTS) {
+            hc_grad_sample(&s->grad[z->rx_color[2] - 1], pick, h->color);
+        } else {
+            uint8_t hsv[3] = {pick, 255, 255};
+            hc_hsv2rgb(hsv, h->color);
+        }
+        if (memcmp(h->color, st->last_color[led], 3) != 0) break;
+    }
+    // A constant/empty palette cannot provide a different colour. Fall back to
+    // full spectrum rather than repeat the same key's previous colour.
+    if (memcmp(h->color, st->last_color[led], 3) == 0) {
+        uint8_t hsv[3] = {pick, 255, 255};
+        hc_hsv2rgb(hsv, h->color);
+        if (memcmp(h->color, st->last_color[led], 3) == 0) {
+            hsv[0] = (uint8_t)(pick + 43u);
+            hc_hsv2rgb(hsv, h->color);
+        }
+    }
+    memcpy(st->last_color[led], h->color, 3);
+    h->brightness = random ? z->rx_color[0] : 255;
+
     st->heat[led] = qadd8(st->heat[led], 40);
 }
 
@@ -608,6 +634,8 @@ void hc_render_led(const hc_scene_t *s, const hc_state_t *st, uint8_t led, uint3
 
     // ---- reactive overlay
     uint8_t kind = z->reactive & 0x0F;
+    bool random = kind >= HC_RX_RANDOM_FLASH && kind < HC_RX_COUNT;
+    uint8_t mode = random ? (uint8_t)(kind - HC_RX_RANDOM_FLASH + HC_RX_FLASH) : kind;
     if (kind != HC_RX_NONE && kind < HC_RX_COUNT && !(zl & HC_LF_NO_REACT)) {
         uint32_t dur = 200u + (uint32_t)(15u - (z->reactive >> 4)) * 120u;
         uint8_t  e   = 0;
@@ -620,20 +648,22 @@ void hc_render_led(const hc_scene_t *s, const hc_state_t *st, uint8_t led, uint3
             if (age >= dur) continue;
             uint8_t fade = (uint8_t)(255u - (age * 255u) / dur);
             uint8_t f    = 0;
-            switch (kind) {
+            uint16_t radius = random ? (z->rx_color[1] ? z->rx_color[1] : 1u) : 28u;
+            switch (mode) {
                 case HC_RX_FLASH:
                     if (h->led == led) f = fade;
                     break;
                 case HC_RX_GLOW: {
                     uint16_t dist = dist_to(h->x, h->y, x, y);
-                    if (dist < 28) f = hc_scale8(fade, (uint8_t)(255u - (dist * 255u) / 28u));
+                    if (dist < radius) f = hc_scale8(fade, (uint8_t)(255u - (dist * 255u) / radius));
                     break;
                 }
                 case HC_RX_RIPPLE: {
-                    uint32_t r    = (age * 3u) / 10u;
+                    uint32_t r    = random ? (age * radius) / dur : (age * 3u) / 10u;
                     uint16_t dist = dist_to(h->x, h->y, x, y);
                     uint32_t dd   = dist > r ? dist - r : r - dist;
-                    if (dd < 10) f = hc_scale8(fade, (uint8_t)((10u - dd) * 25u));
+                    if ((!random || dist <= radius) && dd < 10) f = hc_scale8(fade, (uint8_t)((10u - dd) * 25u));
+                    if (random && h->led == led) f = fade;
                     break;
                 }
                 case HC_RX_ECHO:
@@ -648,7 +678,10 @@ void hc_render_led(const hc_scene_t *s, const hc_state_t *st, uint8_t led, uint3
                 default:
                     break;
             }
-            if (f > e) e = f;
+            if (random) {
+                // Add independent hit contributions; no global colour shared by overlaps.
+                for (uint8_t k = 0; k < 3; k++) c[k] = qadd8(c[k], hc_scale8(hc_scale8(h->color[k], h->brightness), f));
+            } else if (f > e) e = f;
         }
         if (e) {
             uint8_t rc[3];

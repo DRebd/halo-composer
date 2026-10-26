@@ -87,6 +87,9 @@ typedef enum {
     HC_RX_GLOW,   // soft glow around the pressed key
     HC_RX_RIPPLE, // ring expanding from the pressed key (reaches the halo too)
     HC_RX_ECHO,   // halo LEDs nearest (by angle) to the pressed key light up
+    HC_RX_RANDOM_FLASH, // random variants reuse the existing overlay envelopes
+    HC_RX_RANDOM_GLOW,
+    HC_RX_RANDOM_RIPPLE,
     HC_RX_COUNT
 } hc_reactive_t;
 
@@ -129,7 +132,7 @@ typedef struct HC_PACKED {
     uint8_t gradient;  // gradient slot 0..HC_GRADIENTS-1
     uint8_t reactive;  // low nibble hc_reactive_t, high nibble reactive speed 0..15
     uint8_t color[3];  // zone colour (HC_SRC_ZONE) and accent colour (sparkle etc.)
-    uint8_t rx_color[3]; // reactive colour (black = white)
+    uint8_t rx_color[3]; // fixed: RGB (black = white); random: brightness, radius, palette (0=rainbow, 1..4=gradient)
 } hc_zone_t; // 20 bytes
 
 typedef struct HC_PACKED {
@@ -159,12 +162,16 @@ typedef struct HC_PACKED {
 typedef struct HC_PACKED {
     uint8_t  led;
     uint8_t  x, y;
+    uint8_t color[3]; // immutable per-press random RGB, before brightness
+    uint8_t brightness;
     uint32_t t; // ms timestamp of the press
 } hc_hit_t;
 
 typedef struct {
     hc_hit_t hits[HC_MAX_HITS];
     uint8_t  hit_head;
+    uint32_t random_sequence;
+    uint8_t  last_color[HC_LED_COUNT][3];
     uint8_t  heat[HC_LED_COUNT];
     uint32_t heat_t;
 } hc_state_t;

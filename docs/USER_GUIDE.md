@@ -232,3 +232,7 @@ For what differs from NuPhy's stock firmware, see [WHATS_DIFFERENT.md](WHATS_DIF
 - **One editor at a time.** VIA and Studio, or two Studio tabs, confuse each other when open together. Close one.
 - **Macro space** in VIA is about 1.5 KB (1,485 bytes) with Composer, instead of about 2.4 KB in ryodeushii's plain firmware, because the saved scene uses part of that space.
 - **Firmware updates** reset the keyboard's saved settings, including the scene. Export your scene first; see [FLASHING.md](FLASHING.md#updating-to-a-new-release).
+
+## Random Reactive RGB (this fork)
+
+The Zones panel includes Random Reactive RGB — Flash, Glow and Ripple in Keypress overlay. Each press captures its own colour. Choose fade, reaction brightness, radius and a full-spectrum or editable gradient palette. The Random Reactive RGB starter has a dark background. Save to keyboard for standalone wired/Bluetooth/2.4 GHz lighting. See [the complete guide](RANDOM_REACTIVE_RGB.md) for installation, dark/static backgrounds and the eight-hit overlap limit.

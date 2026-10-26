@@ -1,5 +1,7 @@
 # Halo Composer
 
+This fork adds **Random Reactive RGB** (Flash, Glow and Ripple), with per-press colours, configurable fade, brightness, radius and palettes. See [setup, installation and validation](docs/RANDOM_REACTIVE_RGB.md). Use the matching Studio and firmware built from this fork.
+
 **Per-LED lighting for the NuPhy Halo75 V2.** Halo Composer is a replacement keyboard firmware with its own lighting engine, and **Halo Studio** is the browser editor that goes with it. A Composer scene combines all of this at the same time:
 
 - **a color for every LED**: the 83 key LEDs and all 42 "halo" LEDs around the base;

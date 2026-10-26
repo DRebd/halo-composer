@@ -15,7 +15,7 @@
   const FX = { STATIC: 0, BREATHE: 1, PULSE: 2, WAVE: 3, SATWAVE: 4, HUE_DRIFT: 5, COLOR_CYCLE: 6, FLOW: 7, SPARKLE: 8, CANDLE: 9, RAINDROPS: 10, COMET: 11, STROBE: 12, REACT_FADE: 13, RIPPLE: 14, HEATMAP: 15, OFF: 16, COUNT: 17 };
   const SRC = { MAP: 0, ZONE: 1, GRADIENT: 2, RAINBOW: 3, COUNT: 4 };
   const AXIS = { X: 0, Y: 1, RADIAL: 2, ANGLE: 3, SPIRAL: 4, DIAG: 5, RING: 6, NONE: 7, COUNT: 8 };
-  const RX = { NONE: 0, FLASH: 1, GLOW: 2, RIPPLE: 3, ECHO: 4, COUNT: 5 };
+  const RX = { NONE: 0, FLASH: 1, GLOW: 2, RIPPLE: 3, ECHO: 4, RANDOM_FLASH: 5, RANDOM_GLOW: 6, RANDOM_RIPPLE: 7, COUNT: 8 };
   const ZF = { REVERSE: 1, SRC_SCROLL: 2, MIRROR: 4, PINGPONG: 8 }; // PINGPONG = "back and forth"
   const GF = { WRAP: 1, MIRROR: 2 }; // gradient.flags
   const SF = { GAMMA: 1, HALO_FOLLOWS_KEYS: 2 };
@@ -215,6 +215,7 @@
       this.keyXY = keyXY; // Uint8Array(83*2)
       this.hits = [];
       for (let i = 0; i < MAX_HITS; i++) this.hits.push({ led: 0xFF, x: 0, y: 0, t: 0 });
+      this.randomSequence = 0; this.lastColor = new Uint8Array(LED_COUNT * 3);
       this.hitHead = 0;
       this.heat = new Uint8Array(LED_COUNT);
       this.heatT = 0;
@@ -222,6 +223,7 @@
     }
     reset() {
       for (const h of this.hits) { h.led = 0xFF; h.x = 0; h.y = 0; h.t = 0; }
+      this.randomSequence = 0; this.lastColor.fill(0);
       this.hitHead = 0; this.heat.fill(0); this.heatT = 0;
     }
     ledXY(s, led, out) {
@@ -253,6 +255,21 @@
       const h = this.hits[this.hitHead];
       this.hitHead = (this.hitHead + 1) % MAX_HITS;
       h.led = led; const xy = this.ledXY(s, led, [0, 0]); h.x = xy[0]; h.y = xy[1]; h.t = t >>> 0;
+      const z = s.zones[s.zoneOf[led] & LF.ZONE_MASK], random = (z.reactive & 15) >= RX.RANDOM_FLASH;
+      this.randomSequence = (this.randomSequence + 1) >>> 0;
+      let pick = hash32((t >>> 0) ^ (led << 16) ^ Math.imul(this.randomSequence, 0x9E3779B9)) & 255;
+      h.color = [0, 0, 0];
+      for (let n = 0; n < 256; n++, pick = (pick + 1) & 255) {
+        if (random && z.rxColor[2] >= 1 && z.rxColor[2] <= GRADIENTS) gradSample(s.grad[z.rxColor[2] - 1], pick, h.color);
+        else hsv2rgb(pick, 255, 255, h.color);
+        if (h.color.some((v, k) => v !== this.lastColor[led * 3 + k])) break;
+      }
+      if (h.color.every((v, k) => v === this.lastColor[led * 3 + k])) {
+        hsv2rgb(pick, 255, 255, h.color);
+        if (h.color.every((v, k) => v === this.lastColor[led * 3 + k])) hsv2rgb((pick + 43) & 255, 255, 255, h.color);
+      }
+      this.lastColor.set(h.color, led * 3);
+      h.brightness = random ? z.rxColor[0] : 255;
       this.heat[led] = qadd8(this.heat[led], 40);
     }
     frameBegin(s, t) {
@@ -400,6 +417,8 @@
         default: break;
       }
       const kind = z.reactive & 0x0F;
+      const random = kind >= RX.RANDOM_FLASH && kind < RX.COUNT;
+      const mode = random ? kind - RX.RANDOM_FLASH + RX.FLASH : kind;
       if (kind !== RX.NONE && kind < RX.COUNT && !(zl & LF.NO_REACT)) {
         const dur = 200 + (15 - (z.reactive >> 4)) * 120;
         let e = 0;
@@ -410,16 +429,18 @@
           if (age >= dur) continue;
           const fade = 255 - Math.floor((age * 255) / dur);
           let f = 0;
-          if (kind === RX.FLASH) { if (h.led === led) f = fade; }
-          else if (kind === RX.GLOW) {
+          const radius = random ? (z.rxColor[1] || 1) : 28;
+          if (mode === RX.FLASH) { if (h.led === led) f = fade; }
+          else if (mode === RX.GLOW) {
             const dx = x - h.x, dy = y - h.y, dist = isqrt32(dx * dx + dy * dy);
-            if (dist < 28) f = scale8(fade, 255 - Math.floor((dist * 255) / 28));
-          } else if (kind === RX.RIPPLE) {
-            const r = Math.floor((age * 3) / 10);
+            if (dist < radius) f = scale8(fade, 255 - Math.floor((dist * 255) / radius));
+          } else if (mode === RX.RIPPLE) {
+            const r = random ? Math.floor(age * radius / dur) : Math.floor((age * 3) / 10);
             const dx = x - h.x, dy = y - h.y, dist = isqrt32(dx * dx + dy * dy);
             const dd = Math.abs(dist - r);
-            if (dd < 10) f = scale8(fade, (10 - dd) * 25);
-          } else if (kind === RX.ECHO) {
+            if ((!random || dist <= radius) && dd < 10) f = scale8(fade, (10 - dd) * 25);
+            if (random && h.led === led) f = fade;
+          } else if (mode === RX.ECHO) {
             if (led >= KEY_LEDS) {
               const ah = atan2_8(y - CY, x - CX), ak = atan2_8(h.y - CY, h.x - CX);
               let d = (ah - ak) & 0xFF;
@@ -427,7 +448,9 @@
               if (d < 20) f = scale8(fade, 255 - d * 12);
             }
           }
-          if (f > e) e = f;
+          if (random) {
+            for (let k = 0; k < 3; k++) c[k] = qadd8(c[k], scale8(scale8(h.color[k], h.brightness), f));
+          } else if (f > e) e = f;
         }
         if (e) {
           const rc = this._rc;

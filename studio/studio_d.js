@@ -217,10 +217,14 @@ function tabZones(body) {
         : field('Accent color', colorInput(z.color, (c) => upd((q) => { q.color = c; })), usesAccent ? 'black = own color' : 'not used', TIP.accent + (usesAccent ? '' : ` ${name} doesn't use it.`)),
     ),
     el('div', { class: 'sec' }, h3('Keypress overlay', TIP.overlay),
-      select('Reaction', RX_META.map((r) => r[0]), z.reactive & 15, (v) => updR((q) => { q.reactive = (q.reactive & 0xF0) | v; }), TIP.reaction),
+      select('Reaction', RX_META.map((r) => r[0]), z.reactive & 15, (v) => updR((q) => { if (v >= RX.RANDOM_FLASH && (q.reactive & 15) < RX.RANDOM_FLASH) q.rxColor = [255, 36, 0]; q.reactive = (q.reactive & 0xF0) | v; }), TIP.reaction),
       (z.reactive & 15) ? el('div', { class: 'desc' }, RX_META[z.reactive & 15][1]) : null,
       (z.reactive & 15) ? slider('Fade', z.reactive >> 4, 0, 15, (v) => upd((q) => { q.reactive = (q.reactive & 0x0F) | (v << 4); }), (v) => `${((200 + (15 - v) * 120) / 1000).toFixed(2)} s`, TIP.fade) : null,
-      (z.reactive & 15) ? field('Reaction color', colorInput(z.rxColor, (c) => upd((q) => { q.rxColor = c; })), 'black = white', TIP.rxColor) : null,
+      (z.reactive & 15) >= RX.RANDOM_FLASH ? slider('Reaction brightness', z.rxColor[0], 0, 255, (v) => upd((q) => { q.rxColor[0] = v; }), pct) : null,
+      (z.reactive & 15) >= RX.RANDOM_GLOW ? slider('Reaction radius', z.rxColor[1], 1, 224, (v) => upd((q) => { q.rxColor[1] = v; }), (v) => `${(v / 12).toFixed(1)} keys`) : null,
+      (z.reactive & 15) >= RX.RANDOM_FLASH ? select('Reaction palette', ['Full spectrum', 'Gradient slot 1', 'Gradient slot 2', 'Gradient slot 3', 'Gradient slot 4'], z.rxColor[2] <= 4 ? z.rxColor[2] : 0, (v) => upd((q) => { q.rxColor[2] = v; })) : null,
+      (z.reactive & 15) >= RX.RANDOM_FLASH ? el('p', { class: 'hint' }, 'Edit palette colors in Gradients. Use at least two different colors; a constant palette falls back to full spectrum to avoid repeats. For a dark background select Static with Min and Max bright at 0%; for existing lighting keep the current effect. Up to eight presses overlap; further presses replace the oldest.') : null,
+      (z.reactive & 15) > 0 && (z.reactive & 15) < RX.RANDOM_FLASH ? field('Reaction color', colorInput(z.rxColor, (c) => upd((q) => { q.rxColor = c; })), 'black = white', TIP.rxColor) : null,
       el('p', { class: 'hint' }, 'Tip: set Tool to "Type (test reactive)" and click keys to try reactions.')),
   );
 }

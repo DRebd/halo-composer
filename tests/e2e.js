@@ -221,6 +221,45 @@ let packets = 0;
   });
   ok(lst.storedFirstIsBackup && lst.mineFirst && lst.mine.join() === 'Second save,First save', 'My scenes lists named saves first, newest first, then the backups', JSON.stringify(lst));
   ok(lst.backups.length >= 2 && lst.backups.every((t) => /^Before (connecting|reading keyboard|factory scene)$/.test(t)) && lst.when.every((t) => /^[A-Z][a-z]{2} \d{1,2}, \d{1,2}:\d\d\s[AP]M$/.test(t)), 'backups show a short label and their date and time', JSON.stringify(lst));
+  // Random Reactive RGB: real controls -> protocol -> EEPROM -> reboot -> preview parity.
+  await p.click('#tabs button[data-tab=scenes]');
+  await p.getByText('Random Reactive RGB', { exact: true }).click();
+  await p.click('#tabs button[data-tab=zones]');
+  for (const mode of [5, 6, 7]) {
+    await p.getByLabel('Reaction', { exact: true }).selectOption(String(mode));
+    await p.getByLabel('Reaction brightness', { exact: true }).fill('180');
+    await p.getByLabel('Fade', { exact: true }).fill('10');
+    if (mode !== 5) await p.getByLabel('Reaction radius', { exact: true }).fill('48');
+    await p.getByLabel('Reaction palette', { exact: true }).selectOption('2');
+    await p.waitForTimeout(1000);
+    await cmp(`Random mode ${mode}: controls reach firmware RAM`, 'SCENE');
+  }
+  await p.click('#btnSave'); await p.waitForTimeout(1000);
+  await cmp('Random Reactive RGB: saved scene == EEPROM', 'EEPROM');
+  await ask('REBOOT');
+  await cmp('Random Reactive RGB: scene survives reboot', 'SCENE');
+  // Both engines start with empty hit buffers. Real matrix events use the same
+  // code path regardless of the transport sending key reports to the host.
+  await p.evaluate(() => { HaloStudio.engine.reset(); HaloStudio.state.preview.typing = false; });
+  for (const [time, col] of [[10000, 1], [10000, 1], [10073, 2], [10146, 1]]) {
+    await ask('FRAME ' + time); await ask('KEY 1 ' + col);
+    await p.evaluate(({ time, col }) => HaloStudio.engine.keyHit(HaloStudio.state.scene, 16 + col, time), { time, col });
+    const actual = await ask('FRAME ' + (time + 40));
+    const expected = await p.evaluate((time) => {
+      const out = new Uint8Array(384);
+      HaloStudio.engine.renderFrame(HaloStudio.state.scene, time + 40, { keys: 255, halo: 255 }, out);
+      return Array.from(out, (v) => v.toString(16).padStart(2, '0')).join('');
+    }, time);
+    ok(actual === expected, `Random preview == firmware after overlapping key at ${time}`);
+  }
+  await p.evaluate(() => HaloStudio.engine.reset());
+  await p.click('#toolSeg button[data-tool=type]');
+  await p.keyboard.press('q'); await p.keyboard.press('w');
+  ok(await p.evaluate(() => HaloStudio.engine.randomSequence === 2), 'Type tool sends real browser key events to the random preview');
+  await p.check('#pvTyping'); await p.waitForTimeout(500);
+  ok(await p.evaluate(() => HaloStudio.engine.randomSequence > 2), 'simulated typing drives the live random preview');
+  await p.screenshot({ path: path.join(__dirname, '..', 'dist', 'random-reactive-studio.png'), fullPage: true });
+  await p.uncheck('#pvTyping');
   // 8e. a keyboard without Composer firmware gets a clear message and no connection
   const p2 = await newStudioPage();
   await p2.goto(html + '?stock=1'); await p2.waitForTimeout(400);

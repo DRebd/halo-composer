@@ -85,6 +85,9 @@ const AXIS_NAMES = ['Left → right', 'Back → front', 'Center → out', 'Aroun
 const RX_META = [
   ['None', ''], ['Flash', 'The pressed key itself flashes the reaction color and fades.'], ['Glow', 'A soft glow lights the keys around the pressed one, fading with distance.'],
   ['Ripple', 'A ring expands from the pressed key. It shows on every LED in this zone: give the halo\'s zone a Ripple too to carry it into the halo.'], ['Halo echo', 'Halo LEDs in the direction of the pressed key (seen from the keyboard\'s center) light up. Only halo LEDs react, so use it on halo zones.'],
+  ['Random Reactive RGB — Flash', 'A new random color on each press, fading on that key.'],
+  ['Random Reactive RGB — Glow', 'Each press has its own random color, softly spreading to nearby keys.'],
+  ['Random Reactive RGB — Ripple', 'Each press sends its own colored ring outward while the pressed key fades.'],
 ];
 
 // Speed. Most effects turn the stored byte into a cycle of 262144 / (speed + 16) ms:
@@ -305,6 +308,10 @@ function baseScene() {
   return s;
 }
 const SCENES = [
+  { name: 'Random Reactive RGB', note: 'Dark keys with a different random color on each press. Choose Flash, Glow or Ripple in Zones.', names: ['Keys', 'Zone 2', 'Halo'], build: () => {
+    const s = baseScene(); assign(s, range(0, 127), 0);
+    s.zones[0] = Z({ effect: FX.STATIC, vMax: 0, reactive: RX.RANDOM_GLOW | (8 << 4), rxColor: [255, 36, 0] });
+    return s; } },
   { name: 'Warm Desk', note: 'The factory look: 2700K keys that flash mint and send a short mint ripple when pressed; 2700K halo breathing 30–100%.', names: ['Keys', 'Zone 2', 'Halo'], build: () => HC.defaultScene(GEOM) },
   { name: 'Ember Comet', note: 'Soft warm keys; two ember comets orbit the halo; keypresses echo on the halo.', names: ['Keys', 'WASD', 'Halo'], build: () => {
     const s = baseScene(); s.grad[2] = makeGradient('Ember');
